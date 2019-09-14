@@ -17,6 +17,12 @@ pragma solidity ^0.5.7;
   
    - Need to add transferOut so user can move out funds.
    - Restrict caller to be owner where needed
+
+
+   PICKUP:
+   - mock out compound stuff for deposit
+   - test deposit
+   - ensure return value format of returns (uint[]) is as expected (try in MainNet?)
 */
 
 contract MarginSwap {
@@ -427,6 +433,7 @@ contract MarginSwap {
 
       /* Step 4. Send acquired funds */
       {
+        /* TODO (didn't do?) */
         if amount {
           mstore(m_in, fn_hash("borrow(uint256)"))
           mstore(add(m_in, 4), amount)
