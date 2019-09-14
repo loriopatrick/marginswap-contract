@@ -13,6 +13,12 @@ pragma solidity ^0.5.7;
   verify that the contract exists.
 */
 
+/* TODOs:
+  
+   - Need to add transferOut so user can move out funds.
+   - Restrict caller to be owner where needed
+*/
+
 contract MarginSwap {
   uint256 _owner;
   uint256 _parent_address;
@@ -38,6 +44,10 @@ contract MarginSwap {
 
   function enterMarkets(address[] calldata cTokens) external {
     assembly {
+      if xor(caller, sload(_owner_slot)) {
+        REVERT(0)
+      }
+
       /* assert: array position is standard */
       if xor(0x20, calldataload(4)) {
         REVERT(1)

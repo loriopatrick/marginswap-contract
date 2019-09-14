@@ -4,12 +4,14 @@ import com.greghaskins.spectrum.Spectrum;
 import com.marginswap.contracts.ComptrollerMock;
 import com.marginswap.contracts.ERC20;
 import com.marginswap.contracts.MarginSwap;
+import dev.dcn.test.Accounts;
 import org.junit.runner.RunWith;
 
 import java.math.BigInteger;
 import java.util.Arrays;
 
 import static com.greghaskins.spectrum.Spectrum.it;
+import static dev.dcn.test.AssertHelpers.assertRevert;
 import static dev.dcn.test.AssertHelpers.assertSuccess;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -18,6 +20,11 @@ import static org.junit.Assert.assertTrue;
 public class MarginSwapTest {
     {
         Network.DescribeCheckpoint();
+
+        it("should not be able to enter markets with non owner account", () -> {
+            assertRevert("0x00", Accounts.getTx(10).sendCall(Network.Margin,
+                    MarginSwap.enterMarkets(Arrays.asList(Network.CEther, Network.CToken))));
+        });
 
         it("should enter markets", () -> {
 

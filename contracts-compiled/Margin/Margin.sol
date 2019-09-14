@@ -24,6 +24,10 @@ contract MarginSwap {
   
   function enterMarkets(address[] calldata cTokens) external  {
     assembly {
+      if xor(caller, sload(_owner_slot)) {
+        mstore(32, 0)
+        revert(63, 1)
+      }
       if xor(0x20, calldataload(4)) {
         mstore(32, 1)
         revert(63, 1)
