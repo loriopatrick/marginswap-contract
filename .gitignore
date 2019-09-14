@@ -1,0 +1,7 @@
+out/
+.gradle/
+*.iml
+build/
+.idea/
+*.vim
+foo
