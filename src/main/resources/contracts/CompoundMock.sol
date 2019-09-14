@@ -14,18 +14,21 @@ contract CompoundMock {
     string public symbol;
 
     uint256 public exchangeRateStored;
+    address public underlying;
 
     constructor(
         uint256 _initialAmount,
         string memory _tokenName,
         uint8 _decimalUnits,
-        string memory _tokenSymbol
+        string memory _tokenSymbol,
+        address _underlying
     ) public {
         balances[msg.sender] = _initialAmount;
         totalSupply = _initialAmount;
         name = _tokenName;
         decimals = _decimalUnits;
         symbol = _tokenSymbol;
+        underlying = _underlying;
     }
 
     function transfer(address _to, uint256 _value) public returns (bool success) {
@@ -68,6 +71,9 @@ contract CompoundMock {
 
     function allowance(address _owner, address _spender) public view returns (uint256 remaining) {
         return allowed[_owner][_spender];
+    }
+
+    function mint() public payable {
     }
 }
 

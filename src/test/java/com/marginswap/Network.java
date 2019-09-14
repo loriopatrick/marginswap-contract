@@ -1,9 +1,6 @@
 package com.marginswap;
 
-import com.marginswap.contracts.CompoundMock;
-import com.marginswap.contracts.ComptrollerMock;
-import com.marginswap.contracts.MarginParentMock;
-import com.marginswap.contracts.MarginSwap;
+import com.marginswap.contracts.*;
 import dev.dcn.test.Accounts;
 import dev.dcn.test.StaticNetwork;
 import dev.dcn.web3.EtherTransactions;
@@ -16,6 +13,7 @@ public class Network {
     public static final String Comptroller;
     public static final String CEther;
     public static final String CToken;
+    public static final String Token;
     public static final String MarginParent;
     public static final String Margin;
     public static final EtherTransactions owner;
@@ -45,7 +43,18 @@ public class Network {
                     StaticNetwork.GAS_LIMIT,
                     CompoundMock.DeployData(
                             new BigInteger("99999999999999999999999999999"),
-                            "cEther", 8, "cEther"
+                            "cEther", 8, "cEther", "0x0"
+
+                    ),
+                    BigInteger.ZERO
+            );
+
+            Token = owner.deployContract(
+                    BigInteger.ZERO,
+                    StaticNetwork.GAS_LIMIT,
+                    ERC20.DeployData(
+                            new BigInteger("999999999999999999999999999999999999"),
+                            "token", 18, "token"
                     ),
                     BigInteger.ZERO
             );
@@ -55,7 +64,7 @@ public class Network {
                     StaticNetwork.GAS_LIMIT,
                     CompoundMock.DeployData(
                             new BigInteger("99999999999999999999999999999"),
-                            "cToken", 8, "cToken"
+                            "cToken", 8, "cToken", Token
                     ),
                     BigInteger.ZERO
             );

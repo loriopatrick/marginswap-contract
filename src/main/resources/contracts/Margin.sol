@@ -4,6 +4,15 @@ pragma solidity ^0.5.7;
 
 #include "./common.sol"
 
+/* AUDIT NOTE:
+
+  If you call to a non-contract address, the call will be all good even though nothing happens!
+  If you are unsure the address exists, you need to execute extcodesize to check if there's a contract.
+
+  Note: should probably return affirmative success so caller has something to check and doesn't need to
+  verify that the contract exists.
+*/
+
 contract MarginSwap {
   uint256 _owner;
   uint256 _parent_address;
@@ -21,6 +30,12 @@ contract MarginSwap {
     }
   }
 
+  function lookupUnderlying(address cToken) public view returns (address result) {
+    assembly {
+      result := sload(add(_compound_lookup_slot, cToken))
+    }
+  }
+
   function enterMarkets(address[] calldata cTokens) external {
     assembly {
       /* assert: array position is standard */
@@ -29,7 +44,7 @@ contract MarginSwap {
       }
 
       let array_length := calldataload(0x24)
-      let array_start := 0x42
+      let array_start := 0x44
 
       /* assert: calldatasize fits data */
       if xor(add(0x44, mul(0x20, array_length)), calldatasize) {
@@ -77,9 +92,6 @@ contract MarginSwap {
             add(add(call_input, 0x40), mul(i, 0x20))
           )
           has_error := or(has_error, value)
-          if has_error {
-            DEBUG_REVERT(value)
-          }
         }
 
         if has_error {
@@ -99,6 +111,7 @@ contract MarginSwap {
         let cToken_addr := calldataload(i)
 
         let mem_ptr := mload(0x40)
+        let m_out := add(mem_ptr, 4)
 
         /* Step 2: register to lookup */
         {
@@ -111,7 +124,7 @@ contract MarginSwap {
             let res := staticcall(
               gas, cToken_addr,
               mem_ptr, 4,
-              mem_ptr, 32
+              m_out, 32
             )
 
             if iszero(res) {
@@ -120,19 +133,21 @@ contract MarginSwap {
           }
         }
 
-        let underlying_addr := mload(mem_ptr)
+        let underlying_addr := mload(m_out)
         sstore(add(_compound_lookup_slot, underlying_addr), cToken_addr)
 
         /* Step 3: approve transfers from here to cToken */
-        {
-          mstore(mem_ptr, fn_hash("approve(address)"))
+        if underlying_addr {
+          mstore(mem_ptr, fn_hash("approve(address,uint256)"))
           mstore(add(mem_ptr, 4), cToken_addr)
+          mstore(add(mem_ptr, 0x24), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
 
-          let mem_out := add(mem_ptr, 0x24)
+          let mem_out := add(mem_ptr, 0x44)
+          mstore(mem_out, 0)
 
-          let res := staticcall(
-            gas, underlying_addr,
-            mem_ptr, 0x24,
+          let res := call(
+            gas, underlying_addr, 0,
+            mem_ptr, 0x44,
             mem_out, 0x20
           )
 

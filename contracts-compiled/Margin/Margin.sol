@@ -15,6 +15,13 @@ contract MarginSwap {
     }
   }
   
+  function lookupUnderlying(address cToken) public view 
+  returns (address result) {
+    assembly {
+      result := sload(add(_compound_lookup_slot, cToken))
+    }
+  }
+  
   function enterMarkets(address[] calldata cTokens) external  {
     assembly {
       if xor(0x20, calldataload(4)) {
@@ -22,7 +29,7 @@ contract MarginSwap {
         revert(63, 1)
       }
       let array_length := calldataload(0x24)
-      let array_start := 0x42
+      let array_start := 0x44
       if xor(add(0x44, mul(0x20, array_length)), calldatasize) {
         mstore(32, 2)
         revert(63, 1)
@@ -52,10 +59,6 @@ contract MarginSwap {
         } {
           let value := mload(add(add(call_input, 0x40), mul(i, 0x20)))
           has_error := or(has_error, value)
-          if has_error {
-            mstore(32, value)
-            revert(32, 32)
-          }
         }
         if has_error {
           mstore(32, 6)
@@ -71,24 +74,27 @@ contract MarginSwap {
       } {
         let cToken_addr := calldataload(i)
         let mem_ptr := mload(0x40)
+        let m_out := add(mem_ptr, 4)
         {
           mstore(mem_ptr, 0)
           if xor(cToken_addr, cEther_addr) {
             mstore(mem_ptr, /* fn_hash("underlying()") */ 0x6f307dc300000000000000000000000000000000000000000000000000000000)
-            let res := staticcall(gas, cToken_addr, mem_ptr, 4, mem_ptr, 32)
+            let res := staticcall(gas, cToken_addr, mem_ptr, 4, m_out, 32)
             if iszero(res) {
               mstore(32, 7)
               revert(63, 1)
             }
           }
         }
-        let underlying_addr := mload(mem_ptr)
+        let underlying_addr := mload(m_out)
         sstore(add(_compound_lookup_slot, underlying_addr), cToken_addr)
-        {
-          mstore(mem_ptr, /* fn_hash("approve(address)") */ 0xdaea85c500000000000000000000000000000000000000000000000000000000)
+        if underlying_addr {
+          mstore(mem_ptr, /* fn_hash("approve(address,uint256)") */ 0x095ea7b300000000000000000000000000000000000000000000000000000000)
           mstore(add(mem_ptr, 4), cToken_addr)
-          let mem_out := add(mem_ptr, 0x24)
-          let res := staticcall(gas, underlying_addr, mem_ptr, 0x24, mem_out, 0x20)
+          mstore(add(mem_ptr, 0x24), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
+          let mem_out := add(mem_ptr, 0x44)
+          mstore(mem_out, 0)
+          let res := call(gas, underlying_addr, 0, mem_ptr, 0x44, mem_out, 0x20)
           if or(iszero(res), iszero(mload(mem_out))) {
             mstore(32, 8)
             revert(63, 1)
