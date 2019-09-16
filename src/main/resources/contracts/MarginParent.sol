@@ -13,8 +13,17 @@ contract MarginParent {
   address _cEther_address;
   uint256[2**160] _white_listed_addresses;
 
-  #define CONSTRUCT \
-      mstore(cursor, caller) \
+  address public _last_create_address;
+
+  constructor(address comptroller_address, address cEther_address) public {
+    assembly {
+      sstore(_comptroller_address_slot, comptroller_address)
+      sstore(_cEther_address_slot, cEther_address)
+    }
+  }
+
+  #define CONSTRUCT(OWNER) \
+      mstore(cursor, OWNER) \
       cursor := add(cursor, 0x20) \
 \
       mstore(cursor, address) \
@@ -24,10 +33,12 @@ contract MarginParent {
       cursor := add(cursor, 0x20) \
 \
       mstore(cursor, sload(_cEther_address_slot)) \
-      cursor := add(cursor, 0x20)
+      cursor := add(cursor, 0x20) \
+\
+      mstore(0x40, cursor)
 
 
-  function buildMargin() external returns (address margin_contract) {
+  function setupMargin() external returns (address margin_contract) {
     bytes memory margin_swap_compiled = _margin_swap_compiled;
 
     assembly {
@@ -35,10 +46,11 @@ contract MarginParent {
       let contract_start := add(margin_swap_compiled, 0x20)
       let cursor := add(contract_start, compiled_bytes)
 
-      CONSTRUCT
+      CONSTRUCT(caller)
 
+      let contract_size := sub(cursor, contract_start)
       margin_contract := create2(
-        0, contract_start, sub(cursor, contract_start),
+        0, contract_start, contract_size,
         caller
       )
 
@@ -46,11 +58,20 @@ contract MarginParent {
         REVERT(1)
       }
 
+      sstore(_last_create_address_slot, margin_contract)
       sstore(add(_white_listed_addresses_slot, margin_contract), 1)
     }
   }
 
-  function getMarginAddress(address owner) public returns (address margin_contract) {
+  function isMarginSetup(address owner) public view returns (address margin_contract, bool enabled) {
+    margin_contract = getMarginAddress(owner);
+
+    assembly {
+      enabled := sload(add(_white_listed_addresses_slot, margin_contract))
+    }
+  }
+
+  function getMarginAddress(address owner) public view returns (address margin_contract) {
     bytes memory margin_swap_compiled = _margin_swap_compiled;
 
     assembly {
@@ -58,7 +79,7 @@ contract MarginParent {
       let contract_start := add(margin_swap_compiled, 0x20)
       let cursor := add(contract_start, compiled_bytes)
 
-      CONSTRUCT
+      CONSTRUCT(owner)
       
       let contract_size := sub(cursor, contract_start)
       let contract_hash := keccak256(contract_start, contract_size)
@@ -73,12 +94,36 @@ contract MarginParent {
   }
 
   function getCapital(address asset, uint256 amount) external {
+    uint256[3] memory m_in;
+    uint256[1] memory m_out;
+
     assembly {
-      if iszero(sload(_white_listed_addresses_slot, caller)) {
+      if iszero(sload(add(_white_listed_addresses_slot, caller))) {
         REVERT(1)
       }
 
-      /* TODO: send $$ to caller */
+      let m_in_size := 0
+      let wei_to_send := amount
+      let dest := caller
+
+      if asset {
+        mstore(m_in, fn_hash("transfer(address,uint256)"))
+        mstore(add(m_in, 4), caller)
+        mstore(add(m_in, 0x24), amount)
+        dest := asset
+        m_in_size := 0x44
+        wei_to_send := 0
+      }
+
+      let result := call(
+        gas, dest, wei_to_send,
+        m_in, m_in_size,
+        m_out, 32
+      )
+
+      if or(iszero(result), iszero(mload(m_out))) {
+        REVERT(2)
+      }
     }
   }
 }

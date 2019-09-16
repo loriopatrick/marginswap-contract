@@ -1,6 +1,9 @@
 package com.marginswap;
 
-import com.marginswap.contracts.*;
+import com.marginswap.contracts.CompoundMock;
+import com.marginswap.contracts.ComptrollerMock;
+import com.marginswap.contracts.ERC20;
+import com.marginswap.contracts.MarginParent;
 import dev.dcn.test.Accounts;
 import dev.dcn.test.StaticNetwork;
 import dev.dcn.web3.EtherTransactions;
@@ -8,13 +11,15 @@ import dev.dcn.web3.EtherTransactions;
 import java.math.BigInteger;
 
 import static com.greghaskins.spectrum.Spectrum.*;
+import static dev.dcn.test.AssertHelpers.assertSuccess;
+import static junit.framework.TestCase.assertTrue;
 
 public class Network {
     public static final String Comptroller;
     public static final String CEther;
     public static final String CToken;
     public static final String Token;
-    public static final String MarginParent;
+    public static final String Parent;
     public static final String Margin;
     public static final EtherTransactions owner;
 
@@ -31,13 +36,6 @@ public class Network {
                     BigInteger.ZERO
             );
 
-            MarginParent = owner.deployContract(
-                    BigInteger.ZERO,
-                    StaticNetwork.GAS_LIMIT,
-                    MarginParentMock.BINARY,
-                    BigInteger.ZERO
-            );
-
             CEther = owner.deployContract(
                     BigInteger.ZERO,
                     StaticNetwork.GAS_LIMIT,
@@ -46,6 +44,13 @@ public class Network {
                             "cEther", 8, "cEther", "0x0"
 
                     ),
+                    BigInteger.ZERO
+            );
+
+            Parent = owner.deployContract(
+                    BigInteger.ZERO,
+                    StaticNetwork.GAS_LIMIT,
+                    MarginParent.DeployData(Comptroller, CEther),
                     BigInteger.ZERO
             );
 
@@ -69,12 +74,14 @@ public class Network {
                     BigInteger.ZERO
             );
 
-            Margin = owner.deployContract(
-                    BigInteger.ZERO,
-                    StaticNetwork.GAS_LIMIT,
-                    MarginSwap.DeployData(owner.getAddress(), MarginParent, Comptroller, CEther),
-                    BigInteger.ZERO
+            assertSuccess(owner.sendCall(Parent, MarginParent.setupMargin()));
+
+            MarginParent.IsmarginsetupReturnValue isSetup = MarginParent.query_isMarginSetup(
+                    Parent, owner.getWeb3(),
+                    MarginParent.isMarginSetup(owner.getAddress())
             );
+            assertTrue(isSetup.enabled);
+            Margin = isSetup.margin_contract;
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }

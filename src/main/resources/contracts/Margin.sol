@@ -439,17 +439,21 @@ contract MarginSwap {
       {
         let m_in_size := 0
         let wei_to_send := amount
+        let dest := destination
 
         if asset {
           mstore(m_in, fn_hash("transfer(address,uint256)"))
           mstore(add(m_in, 4), destination)
           mstore(add(m_in, 0x24), amount)
+          dest := asset
           m_in_size := 0x44
           wei_to_send := 0
         }
 
+        /* TODO, test withdraw ETH */
+
         let result := call(
-          gas, asset, wei_to_send,
+          gas, dest, wei_to_send,
           m_in, m_in_size,
           m_out, 32
         )

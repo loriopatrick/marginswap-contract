@@ -294,14 +294,16 @@ contract MarginSwap {
       {
         let m_in_size := 0
         let wei_to_send := amount
+        let dest := destination
         if asset {
           mstore(m_in, /* fn_hash("transfer(address,uint256)") */ 0xa9059cbb00000000000000000000000000000000000000000000000000000000)
           mstore(add(m_in, 4), destination)
           mstore(add(m_in, 0x24), amount)
+          dest := asset
           m_in_size := 0x44
           wei_to_send := 0
         }
-        let result := call(gas, asset, wei_to_send, m_in, m_in_size, m_out, 32)
+        let result := call(gas, dest, wei_to_send, m_in, m_in_size, m_out, 32)
         if or(iszero(result), iszero(mload(m_out))) {
           mstore(32, 205)
           revert(63, 1)

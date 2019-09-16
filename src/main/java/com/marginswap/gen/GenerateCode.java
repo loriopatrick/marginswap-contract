@@ -27,12 +27,6 @@ public class GenerateCode {
         );
 
         ContractToJava(
-                new File("src/main/resources/contracts/MarginParentMock.sol"),
-                new File("src/main/generated"),
-                "com.marginswap.contracts"
-        );
-
-        ContractToJava(
                 new File("src/main/resources/contracts/ComptrollerMock.sol"),
                 new File("src/main/generated"),
                 "com.marginswap.contracts"
@@ -44,11 +38,6 @@ public class GenerateCode {
         );
 
         CompileContract(
-                new File("src/main/resources/contracts/MarginParentMock.sol"),
-                new File("contracts-compiled/MarginParentMock")
-        );
-
-        CompileContract(
                 new File("src/main/resources/contracts/ComptrollerMock.sol"),
                 new File("contracts-compiled/ComptrollerMock")
         );
@@ -56,6 +45,17 @@ public class GenerateCode {
         CompileContract(
                 new File("src/main/resources/contracts/CompoundMock.sol"),
                 new File("contracts-compiled/CompoundMock")
+        );
+
+        ContractToJava(
+                new File("src/main/resources/contracts/MarginParent.sol"),
+                new File("src/main/generated"),
+                "com.marginswap.contracts"
+        );
+
+        CompileContract(
+                new File("src/main/resources/contracts/MarginParent.sol"),
+                new File("contracts-compiled/MarginParent")
         );
     }
 }
