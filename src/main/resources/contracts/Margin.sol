@@ -11,6 +11,8 @@ pragma solidity ^0.5.7;
 
   Note: should probably return affirmative success so caller has something to check and doesn't need to
   verify that the contract exists.
+
+  - CHECK that we verify all call results!
 */
 
 /* TODOs:
@@ -245,7 +247,7 @@ contract MarginSwap {
       /* Step 1. Get borrow amount */
       {
         mstore(m_in, fn_hash("borrowBalanceCurrent(address)"))
-        mstore(add(m_in, 4), caller)
+        mstore(add(m_in, 4), address)
         
         let res := staticcall(
           gas, c_address,
@@ -366,10 +368,12 @@ contract MarginSwap {
         REVERT(200)
       }
 
+      let remaining := amount
+
       /* Step 1. Get avaiable balance */
       {
         mstore(m_in, fn_hash("balanceOfUnderlying(address)"))
-        mstore(add(m_in, 4), caller)
+        mstore(add(m_in, 4), address)
         
         let res := staticcall(
           gas, c_address,
@@ -387,8 +391,8 @@ contract MarginSwap {
         let available := mload(m_out)
 
         let to_redeem := available
-        if lt(amount, to_redeem) {
-          to_redeem := amount
+        if lt(remaining, to_redeem) {
+          to_redeem := remaining
         }
 
         if to_redeem {
@@ -409,15 +413,15 @@ contract MarginSwap {
             REVERT(203)
           }
 
-          amount := sub(amount, to_redeem)
+          remaining := sub(remaining, to_redeem)
         }
       }
 
       /* Step 3. Borrow Remaining */
       {
-        if amount {
+        if remaining {
           mstore(m_in, fn_hash("borrow(uint256)"))
-          mstore(add(m_in, 4), amount)
+          mstore(add(m_in, 4), remaining)
 
           let result := call(
             gas, c_address, 0,
@@ -425,7 +429,7 @@ contract MarginSwap {
             m_out, 32
           )
 
-          if mload(m_out) {
+          if or(iszero(result), mload(m_out)) {
             REVERT(204)
           }
         }
@@ -433,20 +437,25 @@ contract MarginSwap {
 
       /* Step 4. Send acquired funds */
       {
-        /* TODO (didn't do?) */
-        if amount {
-          mstore(m_in, fn_hash("borrow(uint256)"))
-          mstore(add(m_in, 4), amount)
+        let m_in_size := 0
+        let wei_to_send := amount
 
-          let result := call(
-            gas, c_address, 0,
-            m_in, 36,
-            m_out, 32
-          )
+        if asset {
+          mstore(m_in, fn_hash("transfer(address,uint256)"))
+          mstore(add(m_in, 4), destination)
+          mstore(add(m_in, 0x24), amount)
+          m_in_size := 0x44
+          wei_to_send := 0
+        }
 
-          if mload(m_out) {
-            REVERT(204)
-          }
+        let result := call(
+          gas, asset, wei_to_send,
+          m_in, m_in_size,
+          m_out, 32
+        )
+
+        if or(iszero(result), iszero(mload(m_out))) {
+          REVERT(205)
         }
       }
     }

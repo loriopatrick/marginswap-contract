@@ -155,7 +155,7 @@ contract MarginSwap {
       }
       {
         mstore(m_in, /* fn_hash("borrowBalanceCurrent(address)") */ 0x17bfdfbc00000000000000000000000000000000000000000000000000000000)
-        mstore(add(m_in, 4), caller)
+        mstore(add(m_in, 4), address)
         let res := staticcall(gas, c_address, m_in, 36, m_out, 32)
         if iszero(res) {
           mstore(32, 101)
@@ -249,9 +249,10 @@ contract MarginSwap {
         mstore(32, 200)
         revert(63, 1)
       }
+      let remaining := amount
       {
         mstore(m_in, /* fn_hash("balanceOfUnderlying(address)") */ 0x3af9e66900000000000000000000000000000000000000000000000000000000)
-        mstore(add(m_in, 4), caller)
+        mstore(add(m_in, 4), address)
         let res := staticcall(gas, c_address, m_in, 36, m_out, 32)
         if iszero(res) {
           mstore(32, 201)
@@ -261,8 +262,8 @@ contract MarginSwap {
       {
         let available := mload(m_out)
         let to_redeem := available
-        if lt(amount, to_redeem) {
-          to_redeem := amount
+        if lt(remaining, to_redeem) {
+          to_redeem := remaining
         }
         if to_redeem {
           mstore(m_in, /* fn_hash("redeemUnderlying(uint256)") */ 0x852a12e300000000000000000000000000000000000000000000000000000000)
@@ -276,29 +277,34 @@ contract MarginSwap {
             mstore(32, 203)
             revert(63, 1)
           }
-          amount := sub(amount, to_redeem)
+          remaining := sub(remaining, to_redeem)
         }
       }
       {
-        if amount {
+        if remaining {
           mstore(m_in, /* fn_hash("borrow(uint256)") */ 0xc5ebeaec00000000000000000000000000000000000000000000000000000000)
-          mstore(add(m_in, 4), amount)
+          mstore(add(m_in, 4), remaining)
           let result := call(gas, c_address, 0, m_in, 36, m_out, 32)
-          if mload(m_out) {
+          if or(iszero(result), mload(m_out)) {
             mstore(32, 204)
             revert(63, 1)
           }
         }
       }
       {
-        if amount {
-          mstore(m_in, /* fn_hash("borrow(uint256)") */ 0xc5ebeaec00000000000000000000000000000000000000000000000000000000)
-          mstore(add(m_in, 4), amount)
-          let result := call(gas, c_address, 0, m_in, 36, m_out, 32)
-          if mload(m_out) {
-            mstore(32, 204)
-            revert(63, 1)
-          }
+        let m_in_size := 0
+        let wei_to_send := amount
+        if asset {
+          mstore(m_in, /* fn_hash("transfer(address,uint256)") */ 0xa9059cbb00000000000000000000000000000000000000000000000000000000)
+          mstore(add(m_in, 4), destination)
+          mstore(add(m_in, 0x24), amount)
+          m_in_size := 0x44
+          wei_to_send := 0
+        }
+        let result := call(gas, asset, wei_to_send, m_in, m_in_size, m_out, 32)
+        if or(iszero(result), iszero(mload(m_out))) {
+          mstore(32, 205)
+          revert(63, 1)
         }
       }
     }

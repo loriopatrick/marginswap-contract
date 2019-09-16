@@ -1,11 +1,14 @@
 package com.marginswap;
 
 import com.greghaskins.spectrum.Spectrum;
+import com.marginswap.contracts.CompoundMock;
 import com.marginswap.contracts.ComptrollerMock;
 import com.marginswap.contracts.ERC20;
 import com.marginswap.contracts.MarginSwap;
 import dev.dcn.test.Accounts;
+import dev.dcn.web3.EtherTransactions;
 import org.junit.runner.RunWith;
+import org.web3j.protocol.core.DefaultBlockParameterName;
 
 import java.math.BigInteger;
 import java.util.Arrays;
@@ -27,7 +30,6 @@ public class MarginSwapTest {
         });
 
         it("should enter markets", () -> {
-
             assertSuccess(Network.owner.sendCall(Network.Margin,
                     MarginSwap.enterMarkets(Arrays.asList(Network.CEther, Network.CToken))));
 
@@ -65,6 +67,102 @@ public class MarginSwapTest {
                         ComptrollerMock.hasEntered(Network.CEther));
                 assertTrue(result.result);
             }
+        });
+
+        it("CToken: deposit should mint without loan", () -> {
+            assertSuccess(Network.owner.sendCall(Network.CToken,
+                    CompoundMock.setRate(200000000000000000L)));
+            assertSuccess(Network.owner.sendCall(Network.Token,
+                    ERC20.approve(Network.Margin, 3_000000000000000000L)));
+
+            assertSuccess(Network.owner.sendCall(Network.Margin,
+                    MarginSwap.deposit(Network.Token, 3_000000000000000000L)));
+
+            /* ensure balance moved to CToken, not margin swap */
+            ERC20.BalanceofReturnValue result;
+
+            result = ERC20.query_balanceOf(Network.Token, Network.owner.getWeb3(), ERC20.balanceOf(Network.Margin));
+            assertEquals(BigInteger.ZERO, result.balance);
+
+            result = ERC20.query_balanceOf(Network.Token, Network.owner.getWeb3(), ERC20.balanceOf(Network.CToken));
+            assertEquals(BigInteger.valueOf(3_000000000000000000L), result.balance);
+
+            /* should have called mint, which will credit cToken to the margin contract */
+            result = ERC20.query_balanceOf(Network.CToken, Network.owner.getWeb3(), ERC20.balanceOf(Network.Margin));
+            assertEquals(new BigInteger("15000000000000000000"), result.balance);
+        });
+
+
+        it("CEth: deposit should mint without loan", () -> {
+            assertSuccess(Network.owner.sendCall(Network.CEther,
+                    CompoundMock.setRate(200000000000000000L)));
+
+            assertSuccess(Network.owner.sendCall(Network.Margin,
+                    MarginSwap.depositEth(), BigInteger.valueOf(3_000000000000000000L)));
+
+            /* ensure balance moved to CToken, not margin swap */
+            assertEquals(
+                    BigInteger.ZERO,
+                    Network.owner.getWeb3().ethGetBalance(Network.Margin, DefaultBlockParameterName.LATEST)
+                            .send().getBalance()
+            );
+
+            assertEquals(
+                    BigInteger.valueOf(3_000000000000000000L),
+                    Network.owner.getWeb3().ethGetBalance(Network.CEther, DefaultBlockParameterName.LATEST)
+                            .send().getBalance()
+            );
+
+            /* should have called mint, which will credit cToken to the margin contract */
+            ERC20.BalanceofReturnValue result;
+            result = ERC20.query_balanceOf(Network.CToken, Network.owner.getWeb3(), ERC20.balanceOf(Network.Margin));
+            assertEquals(new BigInteger("15000000000000000000"), result.balance);
+        });
+
+        EtherTransactions dest = Accounts.getTx(5);
+
+        it("CToken: withdraw should redeem funds", () -> {
+
+            BigInteger cBalanceBefore = ERC20.query_balanceOf(Network.CToken, Network.owner.getWeb3(), ERC20.balanceOf(Network.Margin)).balance;
+
+            assertSuccess(Network.owner.sendCall(Network.Margin,
+                    MarginSwap.withdraw(Network.Token, 1000000L, dest.getAddress())));
+
+            BigInteger cBalanceAfter = ERC20.query_balanceOf(Network.CToken, Network.owner.getWeb3(), ERC20.balanceOf(Network.Margin)).balance;
+            assertEquals(cBalanceBefore.subtract(BigInteger.valueOf(1000000L * 5)), cBalanceAfter);
+
+            assertEquals(
+                    BigInteger.valueOf(1000000L),
+                    ERC20.query_balanceOf(Network.Token, Network.owner.getWeb3(), ERC20.balanceOf(dest.getAddress())).balance
+            );
+
+            assertEquals(
+                    BigInteger.ZERO,
+                    CompoundMock.query_borrowBalanceCurrent(Network.CToken, Network.owner.getWeb3(),
+                            CompoundMock.borrowBalanceCurrent(Network.Margin)).value
+            );
+        });
+
+        it("CToken: withdraw should borrow funds", () -> {
+            assertSuccess(Network.owner.sendCall(Network.Token,
+                    ERC20.transfer(Network.CToken, new BigInteger("10000000000000000000"))));
+
+            assertSuccess(Network.owner.sendCall(Network.Margin,
+                    MarginSwap.withdraw(Network.Token, 3_000000000000000000L, dest.getAddress())));
+
+            BigInteger cBalanceAfter = ERC20.query_balanceOf(Network.CToken, Network.owner.getWeb3(), ERC20.balanceOf(Network.Margin)).balance;
+            assertEquals(BigInteger.ZERO, cBalanceAfter);
+
+            assertEquals(
+                    BigInteger.valueOf(3_000000000000000000L + 1000000L),
+                    ERC20.query_balanceOf(Network.Token, Network.owner.getWeb3(), ERC20.balanceOf(dest.getAddress())).balance
+            );
+
+            assertEquals(
+                    BigInteger.valueOf(1000000L),
+                    CompoundMock.query_borrowBalanceCurrent(Network.CToken, Network.owner.getWeb3(),
+                            CompoundMock.borrowBalanceCurrent(Network.Margin)).value
+            );
         });
     }
 }

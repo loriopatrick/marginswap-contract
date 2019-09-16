@@ -7,6 +7,8 @@ contract CompoundMock {
     uint256 constant private MAX_UINT256 = 2 ** 256 - 1;
     mapping(address => uint256) public balances;
     mapping(address => mapping(address => uint256)) public allowed;
+    mapping(address => uint256) public borrowBalanceCurrent;
+    mapping(address => uint256) public balanceOfUnderlying;
 
     uint256 public totalSupply;
     string public name;
@@ -29,6 +31,67 @@ contract CompoundMock {
         decimals = _decimalUnits;
         symbol = _tokenSymbol;
         underlying = _underlying;
+    }
+
+    function setBorrowCurrent(address _account, uint256 _value) public {
+      borrowBalanceCurrent[_account] = _value;
+    }
+
+    function repayBorrow() public payable {
+      require(borrowBalanceCurrent[msg.sender] >= msg.value);
+
+      borrowBalanceCurrent[msg.sender] -= msg.value;
+    }
+
+    function repayBorrow(uint256 amount) public returns (uint) {
+      require(borrowBalanceCurrent[msg.sender] >= amount);
+
+      CompoundMock erc20 = CompoundMock(underlying);
+      require(erc20.transferFrom(msg.sender, address(this), amount));
+      borrowBalanceCurrent[msg.sender] -= amount;
+      return 0;
+    }
+
+    function mint() public payable {
+      balances[msg.sender] += (msg.value * (10 ** 18)) / exchangeRateStored;
+      balanceOfUnderlying[msg.sender] += msg.value;
+    }
+
+    function mint(uint256 amount) public returns (uint) {
+      CompoundMock erc20 = CompoundMock(underlying);
+      require(erc20.transferFrom(msg.sender, address(this), amount));
+      balances[msg.sender] += (amount * (10 ** 18)) / exchangeRateStored;
+      balanceOfUnderlying[msg.sender] += amount;
+      return 0;
+    }
+
+    function redeemUnderlying(uint256 amount) public returns (uint) {
+      require(balanceOfUnderlying[msg.sender] >= amount);
+
+      balanceOfUnderlying[msg.sender] -= amount;
+      balances[msg.sender] -= (amount * (10 ** 18)) / exchangeRateStored;
+
+      if (underlying == address(0x0)) {
+        require(msg.sender.send(amount));
+      }
+      else {
+        CompoundMock erc20 = CompoundMock(underlying);
+        require(erc20.transfer(msg.sender, amount));
+      }
+
+      return 0;
+    }
+
+    function borrow(uint256 amount) public returns (uint) {
+      borrowBalanceCurrent[msg.sender] += amount;
+
+      if (underlying == address(0x0)) {
+        require(msg.sender.send(amount));
+      }
+      else {
+        CompoundMock erc20 = CompoundMock(underlying);
+        require(erc20.transfer(msg.sender, amount));
+      }
     }
 
     function transfer(address _to, uint256 _value) public returns (bool success) {
@@ -71,9 +134,6 @@ contract CompoundMock {
 
     function allowance(address _owner, address _spender) public view returns (uint256 remaining) {
         return allowed[_owner][_spender];
-    }
-
-    function mint() public payable {
     }
 }
 
