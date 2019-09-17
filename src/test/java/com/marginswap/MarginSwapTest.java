@@ -1,13 +1,12 @@
 package com.marginswap;
 
 import com.greghaskins.spectrum.Spectrum;
-import com.marginswap.contracts.CompoundMock;
-import com.marginswap.contracts.ComptrollerMock;
-import com.marginswap.contracts.ERC20;
-import com.marginswap.contracts.MarginSwap;
+import com.marginswap.contracts.*;
 import dev.dcn.test.Accounts;
+import dev.dcn.test.StaticNetwork;
 import dev.dcn.web3.EtherTransactions;
 import org.junit.runner.RunWith;
+import org.web3j.abi.FunctionEncoder;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 
 import java.math.BigInteger;
@@ -150,12 +149,14 @@ public class MarginSwapTest {
             assertSuccess(Network.owner.sendCall(Network.Margin,
                     MarginSwap.withdraw(Network.Token, 3_000000000000000000L, dest.getAddress())));
 
-            BigInteger cBalanceAfter = ERC20.query_balanceOf(Network.CToken, Network.owner.getWeb3(), ERC20.balanceOf(Network.Margin)).balance;
+            BigInteger cBalanceAfter = ERC20.query_balanceOf(Network.CToken, Network.owner.getWeb3(),
+                    ERC20.balanceOf(Network.Margin)).balance;
             assertEquals(BigInteger.ZERO, cBalanceAfter);
 
             assertEquals(
                     BigInteger.valueOf(3_000000000000000000L + 1000000L),
-                    ERC20.query_balanceOf(Network.Token, Network.owner.getWeb3(), ERC20.balanceOf(dest.getAddress())).balance
+                    ERC20.query_balanceOf(Network.Token, Network.owner.getWeb3(),
+                            ERC20.balanceOf(dest.getAddress())).balance
             );
 
             assertEquals(
@@ -163,6 +164,52 @@ public class MarginSwapTest {
                     CompoundMock.query_borrowBalanceCurrent(Network.CToken, Network.owner.getWeb3(),
                             CompoundMock.borrowBalanceCurrent(Network.Margin)).value
             );
+        });
+
+        it("Should be able to trade with margin", () -> {
+            ERC20.BalanceofReturnValue balanceOf;
+
+            String tradeAddress = Network.owner.deployContract(BigInteger.ZERO, StaticNetwork.GAS_LIMIT,
+                    TradeMock.BINARY, BigInteger.valueOf(7_000000000000000000L));
+
+            long tradeInput = 2_100000000000000000L;
+            long tradeOutput = 6_300000000000000000L;
+
+            String encodedTrade = FunctionEncoder.encode(TradeMock.trade(
+                    Network.Token, "0x0", tradeInput, tradeOutput
+            ));
+
+            assertSuccess(Network.owner.sendCall(Network.Token, ERC20.transfer(
+                    Network.Parent,
+                    5_000000000000000000L
+            )));
+
+
+            balanceOf = ERC20.query_balanceOf(Network.Token, Network.owner.getWeb3(), ERC20.balanceOf(Network.Margin));
+            assertEquals(BigInteger.valueOf(0), balanceOf.balance);
+
+            assertSuccess(Network.owner.sendCall(Network.Margin,
+                    MarginSwap.trade(
+                            Network.Token,
+                            tradeInput,
+                            "0x0",
+                            tradeOutput,
+                            tradeAddress,
+                            encodedTrade
+                    )
+            ));
+
+            /* balance of parent did not change */
+            balanceOf = ERC20.query_balanceOf(Network.Token, Network.owner.getWeb3(), ERC20.balanceOf(Network.Parent));
+            assertEquals(BigInteger.valueOf(5_000000000000000000L), balanceOf.balance);
+
+            /* margin should not have any balance */
+            balanceOf = ERC20.query_balanceOf(Network.Token, Network.owner.getWeb3(), ERC20.balanceOf(Network.Margin));
+            assertEquals(BigInteger.valueOf(0), balanceOf.balance);
+
+            /* balance of trade contract should have input */
+            balanceOf = ERC20.query_balanceOf(Network.Token, Network.owner.getWeb3(), ERC20.balanceOf(tradeAddress));
+            assertEquals(BigInteger.valueOf(tradeInput), balanceOf.balance);
         });
     }
 }

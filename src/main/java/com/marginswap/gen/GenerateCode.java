@@ -32,6 +32,12 @@ public class GenerateCode {
                 "com.marginswap.contracts"
         );
 
+        ContractToJava(
+                new File("src/main/resources/contracts/TradeMock.sol"),
+                new File("src/main/generated"),
+                "com.marginswap.contracts"
+        );
+
         CompileContract(
                 new File("src/main/resources/contracts/Margin.sol"),
                 new File("contracts-compiled/Margin")

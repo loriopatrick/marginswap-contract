@@ -15,6 +15,8 @@ contract MarginSwap {
     }
   }
   
+  function () external payable  {}
+  
   function lookupUnderlying(address cToken) public view 
   returns (address result) {
     assembly {
@@ -238,7 +240,17 @@ contract MarginSwap {
     }
   }
   
-  function withdraw(address asset, uint256 amount, address destination) public  {
+  function withdraw(address asset, uint256 amount, address destination) external  {
+    assembly {
+      if xor(caller, sload(_owner_slot)) {
+        mstore(32, 1)
+        revert(63, 1)
+      }
+    }
+    _withdraw(asset, amount, destination);
+  }
+  
+  function _withdraw(address asset, uint256 amount, address destination) internal  {
     
     uint256[2] memory m_in;
     
@@ -304,9 +316,15 @@ contract MarginSwap {
           wei_to_send := 0
         }
         let result := call(gas, dest, wei_to_send, m_in, m_in_size, m_out, 32)
-        if or(iszero(result), iszero(mload(m_out))) {
+        if iszero(result) {
           mstore(32, 205)
           revert(63, 1)
+        }
+        if asset {
+          if iszero(mload(m_out)) {
+            mstore(32, 206)
+            revert(63, 1)
+          }
         }
       }
     }
@@ -339,7 +357,7 @@ contract MarginSwap {
       }
       let capital_source := sload(_parent_address_slot)
       {
-        mstore(m_in, /* fn_hash("getCapital(address,address,uint256)") */ 0xab95670400000000000000000000000000000000000000000000000000000000)
+        mstore(m_in, /* fn_hash("getCapital(address,uint256)") */ 0x0a681c5900000000000000000000000000000000000000000000000000000000)
         mstore(add(m_in, 0x04), input_asset)
         mstore(add(m_in, 0x24), input_amount)
         let res := call(gas, capital_source, 0, m_in, 0x44, 0, 0)
@@ -354,66 +372,78 @@ contract MarginSwap {
           revert(63, 1)
         }
         {
-          mstore(m_in, /* fn_hash("approve(uint256)") */ 0xb759f95400000000000000000000000000000000000000000000000000000000)
-          mstore(add(m_in, 4), input_amount)
+          mstore(m_in, /* fn_hash("approve(address,uint256)") */ 0x095ea7b300000000000000000000000000000000000000000000000000000000)
+          mstore(add(m_in, 4), trade_contract)
+          mstore(add(m_in, 0x24), input_amount)
           mstore(m_out, 0)
-          let res := call(gas, trade_contract, 0, m_in, 36, m_out, 32)
+          let res := call(gas, input_asset, 0, m_in, 0x44, m_out, 0x20)
           if or(iszero(res), iszero(mload(m_out))) {
             mstore(32, 4)
             revert(63, 1)
           }
         }
       }
+      let before_balance := balance(address)
+      if output_asset {
+        {
+          mstore(m_in, /* fn_hash("balanceOf(address)") */ 0x70a0823100000000000000000000000000000000000000000000000000000000)
+          mstore(add(m_in, 4), caller)
+          mstore(m_out, 0)
+          let res := staticcall(gas, output_asset, m_in, 0x24, m_out, 0x20)
+          if iszero(res) {
+            mstore(32, 5)
+            revert(63, 1)
+          }
+        }
+        before_balance := mload(m_out)
+      }
       {
-        mstore(m_in, /* fn_hash("balanceOf(address)") */ 0x70a0823100000000000000000000000000000000000000000000000000000000)
-        mstore(add(m_in, 4), output_asset)
-        mstore(m_out, 0)
-        let res := staticcall(gas, caller, m_in, 0x24, m_out, 32)
-        if iszero(res) {
+        if iszero(extcodesize(trade_contract)) {
           mstore(32, 5)
           revert(63, 1)
         }
-      }
-      let before_balance := mload(m_out)
-      {
         let res := call(gas, trade_contract, callvalue, add(trade_data, 0x20), mload(trade_data), 0, 0)
         if iszero(res) {
-          mstore(32, 6)
-          revert(63, 1)
-        }
-      }
-      {
-        mstore(m_in, /* fn_hash("approve(uint256)") */ 0xb759f95400000000000000000000000000000000000000000000000000000000)
-        mstore(add(m_in, 4), 0)
-        mstore(m_out, 0)
-        let res := call(gas, trade_contract, 0, m_in, 36, m_out, 32)
-        if or(iszero(res), iszero(mload(m_out))) {
           mstore(32, 7)
           revert(63, 1)
         }
       }
       {
-        mstore(m_in, /* fn_hash("balanceOf(address)") */ 0x70a0823100000000000000000000000000000000000000000000000000000000)
-        mstore(add(m_in, 4), output_asset)
+        mstore(m_in, /* fn_hash("approve(address,uint256)") */ 0x095ea7b300000000000000000000000000000000000000000000000000000000)
+        mstore(add(m_in, 4), trade_contract)
+        mstore(add(m_in, 0x24), 0)
         mstore(m_out, 0)
-        let res := staticcall(gas, caller, m_in, 0x24, m_out, 32)
-        if iszero(res) {
+        let res := call(gas, input_asset, 0, m_in, 0x44, m_out, 0x20)
+        if or(iszero(res), iszero(mload(m_out))) {
           mstore(32, 8)
           revert(63, 1)
         }
       }
-      let after_balance := mload(m_out)
-      if lt(before_balance, after_balance) {
-        mstore(32, 9)
+      let after_balance := balance(address)
+      if output_asset {
+        {
+          mstore(m_in, /* fn_hash("balanceOf(address)") */ 0x70a0823100000000000000000000000000000000000000000000000000000000)
+          mstore(add(m_in, 4), caller)
+          mstore(m_out, 0)
+          let res := staticcall(gas, output_asset, m_in, 0x24, m_out, 0x20)
+          if iszero(res) {
+            mstore(32, 9)
+            revert(63, 1)
+          }
+        }
+        after_balance := mload(m_out)
+      }
+      if lt(after_balance, before_balance) {
+        mstore(32, 10)
         revert(63, 1)
       }
       output_amount := sub(after_balance, before_balance)
       if lt(output_amount, min_output_amount) {
-        mstore(32, 10)
+        mstore(32, 11)
         revert(63, 1)
       }
     }
     depositToCompound(output_asset, output_amount);
-    withdraw(input_asset, input_amount, address(_parent_address));
+    _withdraw(input_asset, input_amount, address(_parent_address));
   }
 }

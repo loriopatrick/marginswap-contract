@@ -44,6 +44,9 @@ contract MarginSwap {
     }
   }
 
+  function() external payable {
+  }
+
   function lookupUnderlying(address cToken) public view returns (address result) {
     assembly {
       result := sload(add(_compound_lookup_slot, cToken))
@@ -177,15 +180,16 @@ contract MarginSwap {
     }
   }
 
-  #define APPROVE(TOKEN, CONTRACT, AMOUNT, REVERT_1) \
+  #define APPROVE(TOKEN, SPENDER, AMOUNT, REVERT_1) \
     { \
-      mstore(m_in, fn_hash("approve(uint256)")) \
-      mstore(add(m_in, 4), AMOUNT) \
+      mstore(m_in, fn_hash("approve(address,uint256)")) \
+      mstore(add(m_in, 4), SPENDER) \
+      mstore(add(m_in, 0x24), AMOUNT) \
       mstore(m_out, 0) \
       let res := call( \
-        gas, CONTRACT, 0, \
-        m_in, 36, \
-        m_out, 32 \
+        gas, TOKEN, 0, \
+        m_in, 0x44, \
+        m_out, 0x20 \
       ) \
       if or(iszero(res), iszero(mload(m_out))) { \
         REVERT(REVERT_1) \
@@ -358,7 +362,17 @@ contract MarginSwap {
     }
   }
 
-  function withdraw(address asset, uint256 amount, address destination) public {
+  function withdraw(address asset, uint256 amount, address destination) external {
+    assembly {
+      if xor(caller, sload(_owner_slot)) {
+        REVERT(1)
+      }
+    }
+
+    _withdraw(asset, amount, destination);
+  }
+
+  function _withdraw(address asset, uint256 amount, address destination) internal {
     uint256[2] memory m_in;
     uint256[1] memory m_out;
 
@@ -458,8 +472,14 @@ contract MarginSwap {
           m_out, 32
         )
 
-        if or(iszero(result), iszero(mload(m_out))) {
+        if iszero(result) {
           REVERT(205)
+        }
+
+        if asset {
+          if iszero(mload(m_out)) {
+            REVERT(206)
+          }
         }
       }
     }
@@ -481,7 +501,7 @@ contract MarginSwap {
       let res := staticcall( \
         gas, TOKEN, \
         m_in, 0x24, \
-        m_out, 32 \
+        m_out, 0x20 \
       ) \
       if iszero(res) { \
         REVERT(REVERT_1) \
@@ -508,7 +528,7 @@ contract MarginSwap {
 
       /* Step 1: Get source capital from parent contract */
       {
-        mstore(m_in, fn_hash("getCapital(address,address,uint256)"))
+        mstore(m_in, fn_hash("getCapital(address,uint256)"))
         mstore(add(m_in, 0x04), input_asset)
         mstore(add(m_in, 0x24), input_amount)
 
@@ -533,11 +553,18 @@ contract MarginSwap {
         APPROVE(input_asset, trade_contract, input_amount, /* REVERT(4) */ 4)
       }
 
-      BALANCE_OF(caller, output_asset, /* REVERT(5) */ 5)
-      let before_balance := mload(m_out)
+      let before_balance := balance(address)
+      if output_asset {
+        BALANCE_OF(output_asset, caller, /* REVERT(5) */ 5)
+        before_balance := mload(m_out)
+      }
 
       /* Step 3: Execute trade */
       {
+        if iszero(extcodesize(trade_contract)) {
+          REVERT(5)
+        }
+
         /* TODO: what happens if signature returns memory? */
         /* TODO: test with Uniswap, Kyber, 0x */
         let res := call(
@@ -547,22 +574,25 @@ contract MarginSwap {
         )
 
         if iszero(res) {
-          REVERT(6)
+          REVERT(7)
         }
       }
 
-      APPROVE(input_asset, trade_contract, 0, /* REVERT(7) */ 7)
+      APPROVE(input_asset, trade_contract, 0, /* REVERT(8) */ 8)
 
-      BALANCE_OF(caller, output_asset, /* REVERT(8) */ 8)
-      let after_balance := mload(m_out)
+      let after_balance := balance(address)
+      if output_asset {
+        BALANCE_OF(output_asset, caller, /* REVERT(9) */ 9)
+        after_balance := mload(m_out)
+      }
 
-      if lt(before_balance, after_balance) {
-        REVERT(9)
+      if lt(after_balance, before_balance) {
+        REVERT(10)
       }
 
       output_amount := sub(after_balance, before_balance)
       if lt(output_amount, min_output_amount) {
-        REVERT(10)
+        REVERT(11)
       }
     }
 
@@ -570,7 +600,7 @@ contract MarginSwap {
     depositToCompound(output_asset, output_amount);
 
     /* Step 5: Borrow funds to repay parent */
-    withdraw(input_asset, input_amount, address(_parent_address));
+    _withdraw(input_asset, input_amount, address(_parent_address));
   }
 }
 

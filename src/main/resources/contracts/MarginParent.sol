@@ -15,11 +15,14 @@ contract MarginParent {
 
   address public _last_create_address;
 
-  constructor(address comptroller_address, address cEther_address) public {
+  constructor(address comptroller_address, address cEther_address) public payable {
     assembly {
       sstore(_comptroller_address_slot, comptroller_address)
       sstore(_cEther_address_slot, cEther_address)
     }
+  }
+
+  function() external payable {
   }
 
   #define CONSTRUCT(OWNER) \
