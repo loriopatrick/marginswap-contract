@@ -12,6 +12,7 @@ contract MarginSwap {
       sstore(_parent_address_slot, parent_address)
       sstore(_comptroller_address_slot, comptroller_address)
       sstore(_cEther_address_slot, cEther_address)
+      sstore(_trade_running_slot, 1)
     }
   }
   
@@ -181,8 +182,8 @@ contract MarginSwap {
             m_in_size := 36
             wei_to_send := 0
           }
-          let result := call(gas, c_address, wei_to_send, m_in, m_in_size, m_out, 32)
-          if iszero(result) {
+          let res := call(gas, c_address, wei_to_send, m_in, m_in_size, m_out, 32)
+          if iszero(res) {
             mstore(32, 102)
             revert(63, 1)
           }
@@ -280,8 +281,8 @@ contract MarginSwap {
         if to_redeem {
           mstore(m_in, /* fn_hash("redeemUnderlying(uint256)") */ 0x852a12e300000000000000000000000000000000000000000000000000000000)
           mstore(add(m_in, 4), to_redeem)
-          let result := call(gas, c_address, 0, m_in, 36, m_out, 32)
-          if iszero(result) {
+          let res := call(gas, c_address, 0, m_in, 36, m_out, 32)
+          if iszero(res) {
             mstore(32, 202)
             revert(63, 1)
           }
@@ -296,8 +297,8 @@ contract MarginSwap {
         if remaining {
           mstore(m_in, /* fn_hash("borrow(uint256)") */ 0xc5ebeaec00000000000000000000000000000000000000000000000000000000)
           mstore(add(m_in, 4), remaining)
-          let result := call(gas, c_address, 0, m_in, 36, m_out, 32)
-          if or(iszero(result), mload(m_out)) {
+          let res := call(gas, c_address, 0, m_in, 36, m_out, 32)
+          if or(iszero(res), mload(m_out)) {
             mstore(32, 204)
             revert(63, 1)
           }
@@ -315,8 +316,8 @@ contract MarginSwap {
           m_in_size := 0x44
           wei_to_send := 0
         }
-        let result := call(gas, dest, wei_to_send, m_in, m_in_size, m_out, 32)
-        if iszero(result) {
+        let res := call(gas, dest, wei_to_send, m_in, m_in_size, m_out, 32)
+        if iszero(res) {
           mstore(32, 205)
           revert(63, 1)
         }
@@ -331,13 +332,40 @@ contract MarginSwap {
   }
   
   function transferOut(address asset, uint256 amount, address destination) external  {
+    
+    uint256[3] memory m_in;
+    
+    uint256[1] memory m_out;
     assembly {
       if xor(caller, sload(_owner_slot)) {
         mstore(32, 1)
         revert(63, 1)
       }
+      let m_in_size := 0
+      let wei_to_send := amount
+      let dest := destination
+      if asset {
+        mstore(m_in, /* fn_hash("transfer(address,uint256)") */ 0xa9059cbb00000000000000000000000000000000000000000000000000000000)
+        mstore(add(m_in, 4), destination)
+        mstore(add(m_in, 0x24), amount)
+        dest := asset
+        m_in_size := 0x44
+        wei_to_send := 0
+      }
+      let res := call(gas, dest, wei_to_send, m_in, m_in_size, m_out, 32)
+      if iszero(res) {
+        mstore(32, 2)
+        revert(63, 1)
+      }
+      if asset {
+        if iszero(mload(m_out)) {
+          mstore(32, 3)
+          revert(63, 1)
+        }
+      }
     }
   }
+  uint256 _trade_running;
   
   function trade(address input_asset,
                  uint256 input_amount,
@@ -346,14 +374,21 @@ contract MarginSwap {
                  address trade_contract,
                  bytes memory trade_data) public payable  {
     
-    uint256[4] memory m_in;
+    uint256[3] memory m_in;
     
     uint256[1] memory m_out;
     uint256 output_amount;
     assembly {
       if xor(caller, sload(_owner_slot)) {
-        mstore(32, 1)
+        mstore(32, 0)
         revert(63, 1)
+      }
+      {
+        if eq(sload(_trade_running_slot), 2) {
+          mstore(32, 1)
+          revert(63, 1)
+        }
+        sstore(_trade_running_slot, 2)
       }
       let capital_source := sload(_parent_address_slot)
       {
@@ -445,5 +480,8 @@ contract MarginSwap {
     }
     depositToCompound(output_asset, output_amount);
     _withdraw(input_asset, input_amount, address(_parent_address));
+    assembly {
+      sstore(_trade_running_slot, 1)
+    }
   }
 }

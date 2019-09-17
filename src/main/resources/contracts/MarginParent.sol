@@ -124,8 +124,14 @@ contract MarginParent {
         m_out, 32
       )
 
-      if or(iszero(result), iszero(mload(m_out))) {
+      if iszero(result) {
         REVERT(2)
+      }
+
+      if asset {
+        if iszero(mload(m_out)) {
+          REVERT(3)
+        }
       }
     }
   }

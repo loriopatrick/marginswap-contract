@@ -11,19 +11,10 @@ pragma solidity ^0.5.7;
 
   Note: should probably return affirmative success so caller has something to check and doesn't need to
   verify that the contract exists.
-
-  - CHECK that we verify all call results!
 */
 
-/* TODOs:
-  
-   - Need to add transferOut so user can move out funds.
-   - Restrict caller to be owner where needed
-
-
+/* 
    PICKUP:
-   - mock out compound stuff for deposit
-   - test deposit
    - ensure return value format of returns (uint[]) is as expected (try in MainNet?)
 */
 
@@ -41,6 +32,7 @@ contract MarginSwap {
       sstore(_parent_address_slot, parent_address)
       sstore(_comptroller_address_slot, comptroller_address)
       sstore(_cEther_address_slot, cEther_address)
+      sstore(_trade_running_slot, 1)
     }
   }
 
@@ -84,7 +76,6 @@ contract MarginSwap {
           /* size */ call_input_size
         )
 
-        /* NOTE: using input memory to store output, safe? */
         let res := call(
           gas, sload(_comptroller_address_slot), 0,
           call_input,
@@ -287,13 +278,13 @@ contract MarginSwap {
             wei_to_send := 0
           }
 
-          let result := call(
+          let res := call(
             gas, c_address, wei_to_send,
             m_in, m_in_size,
             m_out, 32
           )
 
-          if iszero(result) {
+          if iszero(res) {
             REVERT(102)
           }
 
@@ -413,13 +404,13 @@ contract MarginSwap {
           mstore(m_in, fn_hash("redeemUnderlying(uint256)"))
           mstore(add(m_in, 4), to_redeem)
 
-          let result := call(
+          let res := call(
             gas, c_address, 0,
             m_in, 36,
             m_out, 32
           )
 
-          if iszero(result) {
+          if iszero(res) {
             REVERT(202)
           }
 
@@ -437,13 +428,13 @@ contract MarginSwap {
           mstore(m_in, fn_hash("borrow(uint256)"))
           mstore(add(m_in, 4), remaining)
 
-          let result := call(
+          let res := call(
             gas, c_address, 0,
             m_in, 36,
             m_out, 32
           )
 
-          if or(iszero(result), mload(m_out)) {
+          if or(iszero(res), mload(m_out)) {
             REVERT(204)
           }
         }
@@ -464,15 +455,13 @@ contract MarginSwap {
           wei_to_send := 0
         }
 
-        /* TODO, test withdraw ETH */
-
-        let result := call(
+        let res := call(
           gas, dest, wei_to_send,
           m_in, m_in_size,
           m_out, 32
         )
 
-        if iszero(result) {
+        if iszero(res) {
           REVERT(205)
         }
 
@@ -486,9 +475,41 @@ contract MarginSwap {
   }
 
   function transferOut(address asset, uint256 amount, address destination) external {
+    uint256[3] memory m_in;
+    uint256[1] memory m_out;
+
     assembly {
       if xor(caller, sload(_owner_slot)) {
         REVERT(1)
+      }
+
+      let m_in_size := 0
+      let wei_to_send := amount
+      let dest := destination
+
+      if asset {
+        mstore(m_in, fn_hash("transfer(address,uint256)"))
+        mstore(add(m_in, 4), destination)
+        mstore(add(m_in, 0x24), amount)
+        dest := asset
+        m_in_size := 0x44
+        wei_to_send := 0
+      }
+
+      let res := call(
+        gas, dest, wei_to_send,
+        m_in, m_in_size,
+        m_out, 32
+      )
+
+      if iszero(res) {
+        REVERT(2)
+      }
+
+      if asset {
+        if iszero(mload(m_out)) {
+          REVERT(3)
+        }
       }
     }
   }
@@ -508,20 +529,29 @@ contract MarginSwap {
       } \
     }
 
+  uint256 _trade_running;
+
   function trade(address input_asset,
                  uint256 input_amount,
                  address output_asset,
                  uint256 min_output_amount,
                  address trade_contract,
                  bytes memory trade_data) public payable {
-
-    uint256[4] memory m_in;
+    uint256[3] memory m_in;
     uint256[1] memory m_out;
     uint256 output_amount;
 
     assembly {
       if xor(caller, sload(_owner_slot)) {
-        REVERT(1)
+        REVERT(0)
+      }
+
+      /* protect against re-entry */
+      {
+        if eq(sload(_trade_running_slot), 2) {
+          REVERT(1)
+        }
+        sstore(_trade_running_slot, 2)
       }
 
       let capital_source := sload(_parent_address_slot)
@@ -565,8 +595,6 @@ contract MarginSwap {
           REVERT(5)
         }
 
-        /* TODO: what happens if signature returns memory? */
-        /* TODO: test with Uniswap, Kyber, 0x */
         let res := call(
           gas, trade_contract, callvalue,
           add(trade_data, 0x20), mload(trade_data),
@@ -601,6 +629,10 @@ contract MarginSwap {
 
     /* Step 5: Borrow funds to repay parent */
     _withdraw(input_asset, input_amount, address(_parent_address));
+
+    assembly {
+      sstore(_trade_running_slot, 1)
+    }
   }
 }
 
