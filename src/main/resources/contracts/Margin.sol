@@ -31,7 +31,8 @@ contract MarginSwap {
     address from_asset,
     address to_asset,
     uint256 input,
-    uint256 output
+    uint256 output,
+    uint256 input_fee
   );
 
   constructor(address owner, address parent_address, address comptroller_address, address cEther_address) public {
@@ -635,8 +636,16 @@ contract MarginSwap {
     /* Step 4: Deposit trade output into money market */
     depositToCompound(output_asset, output_amount);
 
+    uint256 fee;
+    uint256 return_amount;
+
+    assembly {
+      fee := div(input_amount, 200)
+      return_amount := add(fee, input_amount)
+    }
+
     /* Step 5: Borrow funds to repay parent */
-    _withdraw(input_asset, input_amount, address(_parent_address));
+    _withdraw(input_asset, return_amount, address(_parent_address));
 
     assembly {
       sstore(_trade_running_slot, 1)
@@ -647,7 +656,8 @@ contract MarginSwap {
         input_asset,
         output_asset,
         input_amount,
-        output_amount
+        output_amount,
+        fee
       )
     }
   }

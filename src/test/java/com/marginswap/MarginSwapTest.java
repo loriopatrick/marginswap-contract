@@ -210,11 +210,12 @@ public class MarginSwapTest {
             assertEquals("0x0000000000000000000000000000000000000000", tradeLog.to_asset);
             assertEquals(BigInteger.valueOf(tradeInput), tradeLog.input);
             assertEquals(BigInteger.valueOf(tradeOutput), tradeLog.output);
+            assertEquals(BigInteger.valueOf(10500000000000000L), tradeLog.input_fee);
             assertEquals(tradeAddress, tradeLog.trade_contract);
 
-            /* balance of parent did not change */
+            /* balance of parent should include fee */
             balanceOf = ERC20.query_balanceOf(Network.Token, Network.owner.getWeb3(), ERC20.balanceOf(Network.Parent));
-            assertEquals(BigInteger.valueOf(5_000000000000000000L), balanceOf.balance);
+            assertEquals(BigInteger.valueOf(5_010500000000000000L), balanceOf.balance);
 
             /* margin should not have any balance */
             balanceOf = ERC20.query_balanceOf(Network.Token, Network.owner.getWeb3(), ERC20.balanceOf(Network.Margin));

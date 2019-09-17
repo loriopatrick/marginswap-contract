@@ -10,7 +10,8 @@ contract MarginSwap {
     address from_asset,
     address to_asset,
     uint256 input,
-    uint256 output
+    uint256 output,
+    uint256 input_fee
   );
   
   constructor(address owner, address parent_address, address comptroller_address, address cEther_address) public  {
@@ -486,7 +487,13 @@ contract MarginSwap {
       }
     }
     depositToCompound(output_asset, output_amount);
-    _withdraw(input_asset, input_amount, address(_parent_address));
+    uint256 fee;
+    uint256 return_amount;
+    assembly {
+      fee := div(input_amount, 200)
+      return_amount := add(fee, input_amount)
+    }
+    _withdraw(input_asset, return_amount, address(_parent_address));
     assembly {
       sstore(_trade_running_slot, 1)
       
@@ -495,7 +502,8 @@ contract MarginSwap {
       mstore(add(m_in, 32), output_asset)
       mstore(add(m_in, 64), input_amount)
       mstore(add(m_in, 96), output_amount)
-      log2(m_in, 128, /* Trade */ 0xec0d3e799aa270a144d7e3be084ccfc657450e33ecea1b1a4154c95cedaae5c3, trade_contract)
+      mstore(add(m_in, 128), fee)
+      log2(m_in, 160, /* Trade */ 0x4a2af5744adbfadba82ab831aea212bad92f5a70fef2079562044f423e999851, trade_contract)
     }
   }
 }
