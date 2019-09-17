@@ -1,0 +1,161 @@
+@import "common.scss";
+
+.App {
+  font-size: $font-size;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  height: 100vh;
+  width: 100vw;
+  overflow: auto;
+  min-width: 600px;
+  background: $background;
+  padding-top: 80px;
+  box-sizing: border-box;
+
+  & > div {
+    & > .header {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+
+      & > .title {
+        color: $text-color;
+        font-weight: bold;
+        font-size: $font-size-logo;
+        min-width: 200px;
+      }
+
+      margin-bottom: 70px;
+    }
+
+    & > .body {
+      .trade {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        border-radius: 2px;
+
+        .input, .output {
+          flex-basis: 50%;
+          flex-grow: 1;
+          box-sizing: border-box;
+          min-width: 400px;
+
+          .title {
+            font-weight: bold;
+            font-size: $font-size-big;
+            padding: 20px;
+          }
+
+          .amount {
+            color: $text-color;
+            position: relative;
+
+            $select-size: 60px;
+            $input-padding: 10px;
+            height: 150px;
+
+            input {
+              position: absolute;
+              top: 0;
+              right: 0;
+              bottom: 0;
+              left: 0;
+              background: darken($background, 10%);
+              color: $text-color;
+
+              padding: 50px;
+
+              border: solid 2px $background;
+              border-radius: 5px;
+              font-size: $font-size-big;
+              box-sizing: border-box;
+              font-weight: bold;
+              width: 100%;
+              height: 100%;
+              outline: none;
+              padding-right: $input-padding + $select-size;
+
+              &:focus {
+                border-color: mix($background, $blue, 50%);
+              }
+            }
+
+            .title {
+              position: absolute;
+              top: 0;
+              left: 0;
+              z-index: 10;
+            }
+
+            .asset-select {
+              position: absolute;
+              bottom: 0;
+              right: 0;
+              // width: $select-size;
+              font-weight: bold;
+              display: flex;
+              flex-direction: row;
+              align-items: center;
+              justify-content: flex-end;
+              padding: $input-padding;
+              box-sizing: border-box;
+              cursor: pointer;
+              background: $background;
+              margin: 10px;
+              border-radius: 5px;
+
+              img {
+                height: $font-size;
+                padding-right: 5px;
+              }
+            }
+          }
+        }
+
+        .auto {
+          .amount {
+            input {
+              background: darken($background, 5%);
+            }
+          }
+        }
+      }
+
+      & > .btn {
+        border-color: $background;
+        padding: 30px;
+        justify-content: center;
+        margin: 5px 0;
+        background: mix($error, $background, 50%);
+        color: mix($background, $text-color, 20%);
+
+        &:hover {
+          border-color: $error;
+          background: mix($error, $background, 70%);
+          color: $text-color;
+        }
+      }
+
+      .positions {
+        border: solid 2px $background;
+        background: mix($blue, $background);
+        border-radius: 5px;
+
+        .position {
+          img {
+            height: $font-size;
+          }
+        }
+      }
+    }
+  }
+}
+
+.container {
+  width: 1200px;
+  max-width: 100%;
+}

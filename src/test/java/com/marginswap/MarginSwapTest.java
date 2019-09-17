@@ -8,15 +8,17 @@ import dev.dcn.web3.EtherTransactions;
 import org.junit.runner.RunWith;
 import org.web3j.abi.FunctionEncoder;
 import org.web3j.protocol.core.DefaultBlockParameterName;
+import org.web3j.protocol.core.methods.response.Log;
+import org.web3j.protocol.core.methods.response.TransactionReceipt;
 
 import java.math.BigInteger;
 import java.util.Arrays;
+import java.util.List;
 
 import static com.greghaskins.spectrum.Spectrum.it;
 import static dev.dcn.test.AssertHelpers.assertRevert;
 import static dev.dcn.test.AssertHelpers.assertSuccess;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 @RunWith(Spectrum.class)
 public class MarginSwapTest {
@@ -188,7 +190,7 @@ public class MarginSwapTest {
             balanceOf = ERC20.query_balanceOf(Network.Token, Network.owner.getWeb3(), ERC20.balanceOf(Network.Margin));
             assertEquals(BigInteger.valueOf(0), balanceOf.balance);
 
-            assertSuccess(Network.owner.sendCall(Network.Margin,
+            TransactionReceipt transactionReceipt = assertSuccess(Network.owner.sendCall(Network.Margin,
                     MarginSwap.trade(
                             Network.Token,
                             tradeInput,
@@ -198,6 +200,17 @@ public class MarginSwapTest {
                             encodedTrade
                     )
             ));
+
+            List<Log> logs = transactionReceipt.getLogs();
+            assertEquals(7, logs.size());
+
+            MarginSwap.Trade tradeLog = MarginSwap.ExtractTrade(logs.get(6));
+            assertNotNull(tradeLog);
+            assertEquals(Network.Token, tradeLog.from_asset);
+            assertEquals("0x0000000000000000000000000000000000000000", tradeLog.to_asset);
+            assertEquals(BigInteger.valueOf(tradeInput), tradeLog.input);
+            assertEquals(BigInteger.valueOf(tradeOutput), tradeLog.output);
+            assertEquals(tradeAddress, tradeLog.trade_contract);
 
             /* balance of parent did not change */
             balanceOf = ERC20.query_balanceOf(Network.Token, Network.owner.getWeb3(), ERC20.balanceOf(Network.Parent));

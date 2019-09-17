@@ -26,6 +26,14 @@ contract MarginSwap {
 
   uint256[2**160] _compound_lookup;
 
+  event Trade(
+    address indexed trade_contract,
+    address from_asset,
+    address to_asset,
+    uint256 input,
+    uint256 output
+  );
+
   constructor(address owner, address parent_address, address comptroller_address, address cEther_address) public {
     assembly {
       sstore(_owner_slot, owner)
@@ -632,6 +640,15 @@ contract MarginSwap {
 
     assembly {
       sstore(_trade_running_slot, 1)
+
+      log_event(
+        Trade, m_in,
+        trade_contract,
+        input_asset,
+        output_asset,
+        input_amount,
+        output_amount
+      )
     }
   }
 }

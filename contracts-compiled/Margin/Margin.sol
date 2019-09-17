@@ -5,6 +5,13 @@ contract MarginSwap {
   uint256 _comptroller_address;
   uint256 _cEther_address;
   uint256[2**160] _compound_lookup;
+  event Trade(
+    address indexed trade_contract,
+    address from_asset,
+    address to_asset,
+    uint256 input,
+    uint256 output
+  );
   
   constructor(address owner, address parent_address, address comptroller_address, address cEther_address) public  {
     assembly {
@@ -482,6 +489,13 @@ contract MarginSwap {
     _withdraw(input_asset, input_amount, address(_parent_address));
     assembly {
       sstore(_trade_running_slot, 1)
+      
+      /* Log event: Trade */
+      mstore(m_in, input_asset)
+      mstore(add(m_in, 32), output_asset)
+      mstore(add(m_in, 64), input_amount)
+      mstore(add(m_in, 96), output_amount)
+      log2(m_in, 128, /* Trade */ 0xec0d3e799aa270a144d7e3be084ccfc657450e33ecea1b1a4154c95cedaae5c3, trade_contract)
     }
   }
 }

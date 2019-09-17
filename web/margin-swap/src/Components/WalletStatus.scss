@@ -1,0 +1,37 @@
+@import "common.scss";
+
+.WalletStatus {
+  .indicator {
+    $size: $font-size;
+    background: $error;
+    width: $size;
+    height: $size;
+    display: inline-text;
+    margin-right: 10px;
+    border-radius: $size;
+  }
+
+  justify-content: flex-end;
+  box-sizing: border-box;
+
+  .status {
+    max-width: 150px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    transition: max-width 0.1s ease-out;
+  }
+
+  &:hover .status {
+    flex-grow: 1;
+    max-width: calc(100vw - 400px);
+  }
+
+  &.connected .indicator {
+    background: $green;
+  }
+
+  &.warn .indicator {
+    background: $yellow;
+  }
+}
