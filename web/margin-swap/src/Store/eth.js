@@ -6,7 +6,8 @@ const MARGIN_ABI = require('abi/MarginSwap.json');
 const ERC20_ABI = require('abi/ERC20.json');
 const CTOKEN_ABI = require('abi/cToken.json');
 
-const MARGIN_PARENT_ADDRESS = '0x9e667a53dd12155fbffe061527d0395b39f27ecc';
+// const MARGIN_PARENT_ADDRESS = '0x9e667a53dd12155fbffe061527d0395b39f27ecc'; // mainnet
+const MARGIN_PARENT_ADDRESS = '0xf3c4a5ac68c1ed1d598faafd62fd39a697ea071d'; // ropsten
 
 
 const Big = require('big.js');

@@ -167,7 +167,7 @@ contract MarginSwap {
       {
         mstore(m_in, /* fn_hash("borrowBalanceCurrent(address)") */ 0x17bfdfbc00000000000000000000000000000000000000000000000000000000)
         mstore(add(m_in, 4), address)
-        let res := staticcall(gas, c_address, m_in, 36, m_out, 32)
+        let res := call(gas, c_address, 0, m_in, 36, m_out, 32)
         if iszero(res) {
           mstore(32, 101)
           revert(63, 1)
@@ -274,7 +274,7 @@ contract MarginSwap {
       {
         mstore(m_in, /* fn_hash("balanceOfUnderlying(address)") */ 0x3af9e66900000000000000000000000000000000000000000000000000000000)
         mstore(add(m_in, 4), address)
-        let res := staticcall(gas, c_address, m_in, 36, m_out, 32)
+        let res := call(gas, c_address, 0, m_in, 36, m_out, 32)
         if iszero(res) {
           mstore(32, 201)
           revert(63, 1)
