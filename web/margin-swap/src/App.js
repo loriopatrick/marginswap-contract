@@ -1,11 +1,34 @@
+import './App.scss';
+
 import React, { Component } from 'react';
 import logo from './logo.svg';
-import './App.scss';
+
+import { connect } from 'react-redux';
 
 import WalletStatus from 'Components/WalletStatus';
 
-import eth_img from 'img/assets/eth.svg';
+import {
+  marginDeposit,
+  enterMarkets,
+} from 'Store/actions';
+
 import assets from 'assets';
+import bat_img from 'img/assets/bat.svg';
+import dai_img from 'img/assets/dai.svg';
+import eth_img from 'img/assets/eth.svg';
+import rep_img from 'img/assets/rep.svg';
+import usdc_img from 'img/assets/usdc.svg';
+import wbtc_img from 'img/assets/wbtc.svg';
+
+const asset_images = {
+  BAT: bat_img,
+  DAI: dai_img,
+  ETH: eth_img,
+  REP: rep_img,
+  USDC: usdc_img,
+  WBTC: wbtc_img,
+};
+
 
 class App extends Component {
   constructor(props) {
@@ -29,16 +52,23 @@ class App extends Component {
     const value = event.target.value;
   }
 
+  deposit(symbol) {
+    const asset = assets[symbol];
+    console.log(asset);
+
+    this.props.dispatch(marginDeposit(symbol, '0.01'));
+  }
+
   render() {
     const dict = {
       input: {
-        title: 'Send',
+        title: 'Input',
         value: this.state.input_amount,
         placeholder: '0.0',
         cls: 'input',
       },
       output: {
-        title: 'Receive',
+        title: 'Output',
         value: this.state.output_amount,
         placeholder: '0.0',
         cls: 'output',
@@ -98,6 +128,19 @@ class App extends Component {
       );
     };
 
+    let account = asset => {
+      return (
+        <div className="account" key={asset.symbol}>
+          <div className="asset"><img src={asset_images[asset.symbol]} /> {asset.symbol}</div>
+          <div className="amount green">+1.32</div>
+          <div className="actions">
+            <div onClick={this.deposit.bind(this, asset.symbol)}>deposit</div>
+            <div>withdraw</div>
+          </div>
+        </div>
+      );
+    };
+
     return (
       <div className="App">
         <div className="container">
@@ -110,11 +153,25 @@ class App extends Component {
               { side('input') }
               { side('output') }
             </div>
-            <div className="btn red">trade</div>
+            <div className="btn red" onClick={() => this.props.dispatch(enterMarkets())}>trade</div>
 
-            <div className="positions">
-              { position() }
+            <div className="data">
+              <div className="accounts">
+                <div className="account">
+                  <div className="title">Margin</div>
+                  <div className="amount">$3,000</div>
+                </div>
+                <div className="account">
+                  <div className="title">Interest</div>
+                  <div className="amount red">Paying: 15% on $12,213</div>
+                </div>
+                { Object.keys(assets).map(k => assets[k]).map(account) }
+              </div>
+              <div className="positions">
+                { position() }
+              </div>
             </div>
+
           </div>
         </div>
       </div>
@@ -122,4 +179,4 @@ class App extends Component {
   }
 }
 
-export default App;
+export default connect(() => {})(App);

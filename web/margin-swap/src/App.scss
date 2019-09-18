@@ -151,6 +151,90 @@
           }
         }
       }
+
+      .data {
+        display: flex;
+        flex-direction: row;
+
+        & > * {
+          flex-basis: 50%;
+          flex-grow: 1;
+        }
+
+        $vertical-margin: 5px;
+
+        .accounts {
+          margin-top: -$vertical-margin;
+        }
+
+        .account {
+          color: $text-color;
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          justify-content: space-between;
+          padding: 10px;
+          margin: $vertical-margin 0;
+          border-radius: 5px;
+          border: solid 2px $background;
+
+          background: darken($background, 10%);
+
+          .title {
+            font-weight: bold;
+          }
+
+          .amount {
+            font-weight: bold;
+            flex-grow: 1;
+            padding: 0 10px;
+
+            &.green {
+              color: $green;
+            }
+            &.red {
+              color: $red;
+            }
+          }
+
+          .title, .asset {
+            width: 100px;
+          }
+
+          .asset {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            font-size: $font-size;
+            font-weight: bold;
+
+            img {
+              height: $font-size;
+              margin-right: 10px;
+            }
+          }
+
+          .actions {
+            display: flex;
+            flex-direction: row;
+
+            div {
+              cursor: pointer;
+              padding: 2px 5px;
+              background: $background;
+              margin-right: 5px;
+
+              &:last-child {
+                margin-right: 0;
+              }
+
+              &:hover {
+                background: mix($blue, $background);
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

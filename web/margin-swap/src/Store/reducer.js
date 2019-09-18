@@ -6,6 +6,18 @@ const INIT_STATE = {
     margin_address: null,
     margin_setup: false,
   },
+  balances: {
+    block_number: 0,
+    balances: {
+      /*
+       * [asset_symbol]: {
+       *   compound_balance: x,
+       *   compound_rate: x,
+       *   borrow_balance: x,
+       * }
+       */
+    },
+  }
 };
 
 const reducer = (state = INIT_STATE, action) => {
