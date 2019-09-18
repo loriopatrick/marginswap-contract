@@ -26,7 +26,7 @@ RUN curl -sL https://deb.nodesource.com/setup_10.x | bash -
 RUN apt-get install -y nodejs
 RUN rm -rf /var/lib/apt/lists/*
 
-RUN curl -L -o solc https://github.com/ethereum/solidity/releases/download/v0.5.7/solc-static-linux
+RUN curl -L -o solc https://github.com/ethereum/solidity/releases/download/v0.5.11/solc-static-linux
 RUN chmod +x solc && mv solc /usr/local/bin
 RUN npm install -g ganache-cli@6.4.1
 RUN npm install -g tsol@1.0.5

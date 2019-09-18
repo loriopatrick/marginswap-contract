@@ -2,11 +2,14 @@ import React from 'react';
 import './WalletStatus.scss';
 
 import { connect } from 'react-redux';
+import { walletView } from 'Store/view';
 
 import {
   walletConnect,
-  walletAuthenticate,
+  enableMargin,
 } from 'Store/actions';
+
+import Spinner from 'Components/Spinner';
 
 const WalletStatus = ({ wallet, dispatch }) => {
   const cls = ['WalletStatus', 'btn'];
@@ -15,17 +18,31 @@ const WalletStatus = ({ wallet, dispatch }) => {
   let action = undefined;
   let link_to = null;
 
-  if (!wallet.connected) {
+  if (wallet.loading || wallet.processing) {
+    msg = <React.Fragment><Spinner /> { wallet.processing || 'Loading' }</React.Fragment>;
+    cls.push('loading');
+  }
+  else if (!wallet.connected) {
     msg = 'Connect Wallet'
     cls.push('disconnected');
     cls.push('red');
 
     action = () => dispatch(walletConnect());
   }
+  else if (!wallet.margin_setup) {
+    msg = 'Margin not enabled'
+    cls.push('yellow', 'warn');
+
+    action = () => dispatch(enableMargin());
+  }
   else {
-    msg = 'Connected: ' + wallet.address;
+    msg = 'Connected: ' + wallet.margin_address;
     cls.push('connected');
     cls.push('green');
+
+    action = () => {
+      window.open('https://etherscan.io/address/' + wallet.margin_address);
+    };
   }
 
   return (
@@ -37,6 +54,6 @@ const WalletStatus = ({ wallet, dispatch }) => {
 }
 
 export default connect(state => ({
-  wallet: state.wallet,
+  wallet: walletView(state),
 }))(WalletStatus);
 

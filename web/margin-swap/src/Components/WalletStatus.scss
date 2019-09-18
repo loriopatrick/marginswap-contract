@@ -15,7 +15,7 @@
   box-sizing: border-box;
 
   .status {
-    max-width: 150px;
+    max-width: 180px;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -33,5 +33,24 @@
 
   &.warn .indicator {
     background: $yellow;
+  }
+
+  &.loading {
+    background: darken($blue, 30%);
+
+    .indicator {
+      display: none;
+    }
+  }
+
+  .Spinner {
+    margin: 0 5px;
+
+    & > div {
+      margin: 0;
+      width: 10px;
+      height: 10px;
+      margin-right: 10px;
+    }
   }
 }

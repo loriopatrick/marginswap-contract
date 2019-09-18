@@ -1,55 +1,8 @@
 import { createStore, applyMiddleware } from 'redux'
 import thunk from 'redux-thunk';
 
-const INIT_STATE = {
-  wallet: {
-    has_web3: false,
-    connected: false,
-    address: null,
-    processing: null,
-  },
-};
-
-const MARGIN_PARENT = '0x9e667a53dd12155fbffe061527d0395b39f27ecc';
-
-const reducer = (state = INIT_STATE, action) => {
-  switch (action.type) {
-    case 'wallet-has3': {
-      return {
-        ...state,
-        wallet: {
-          ...state.wallet,
-          has_web3: true,
-        },
-      };
-    }
-    case 'wallet-address': {
-      return {
-        ...state,
-        wallet: {
-          ...state.wallet,
-          address: action.address,
-          connected: !!action.address,
-        },
-        account: {
-          ...INIT_STATE.account,
-        },
-      };
-    }
-    case 'wallet-processing': {
-      return {
-        ...state,
-        wallet: {
-          ...state.wallet,
-          processing: action.processing,
-        }
-      };
-    }
-    default: {
-      return state;
-    }
-  }
-};
+import EthManager from './eth';
+import reducer from './reducer';
 
 /* setting up */
  /*
@@ -62,52 +15,11 @@ const reducer = (state = INIT_STATE, action) => {
   */
 
 const web3_middle = store => {
-  const { dispatch } = store;
-
-  const getAddress = () => store.getState().wallet.address;
-
   return next => {
-    const ethereum = window.ethereum;
-    const has_web3 = typeof ethereum !== 'undefined';
-
-    setTimeout(() => {
-      if (has_web3) {
-        dispatch({ type: 'wallet-has3' });
-
-        if (ethereum.selectedAddress) {
-          dispatch({
-            type: 'wallet-address',
-            address: ethereum.selectedAddress,
-          });
-        }
-
-        ethereum.on('accountsChanged', accounts => {
-          dispatch({
-            type: 'wallet-address',
-            address: accounts[0],
-          });
-        });
-      }
-    }, 0);
+    const eth_manger = new EthManager(store);
 
     return action => {
-      switch(action.type) {
-        case 'wallet-connect': {
-          if (ethereum) {
-            dispatch({ type: 'wallet-processing', processing: 'connect' });
-
-            ethereum.enable().catch(() => {}).then(() => {
-              dispatch({ type: 'wallet-processing', processing: null });
-            });
-          }
-          break;
-        }
-        case 'wallet-address': {
-          const address = action.address;
-          break;
-        }
-      }
-
+      eth_manger && eth_manger.handle(action);
       next(action);
     };
   };
