@@ -10,6 +10,8 @@ const INIT_STATE = {
   },
 };
 
+const MARGIN_PARENT = '0x9e667a53dd12155fbffe061527d0395b39f27ecc';
+
 const reducer = (state = INIT_STATE, action) => {
   switch (action.type) {
     case 'wallet-has3': {
