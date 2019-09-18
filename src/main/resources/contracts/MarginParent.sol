@@ -9,6 +9,9 @@ contract MarginParent {
   #include "../../../../contracts-compiled/Margin/MarginSwap.bin"
   ";
 
+  address _manager_address;
+  address _manager_proposed;
+
   address _comptroller_address;
   address _cEther_address;
   uint256[2**160] _white_listed_addresses;
@@ -19,10 +22,35 @@ contract MarginParent {
     assembly {
       sstore(_comptroller_address_slot, comptroller_address)
       sstore(_cEther_address_slot, cEther_address)
+      sstore(_manager_address_slot, caller)
+      sstore(add(_white_listed_addresses_slot, caller), 1)
     }
   }
 
   function() external payable {
+  }
+
+  function managerPropose(address new_manager) external {
+    assembly {
+      if xor(caller, sload(_manager_address_slot)) {
+        REVERT(1)
+      }
+
+      sstore(_manager_proposed_slot, new_manager)
+    }
+  }
+
+  function managerSet() external {
+    assembly {
+      let proposed := sload(_manager_proposed_slot)
+      if xor(caller, proposed) {
+        REVERT(1)
+      }
+
+      sstore(add(_white_listed_addresses_slot, sload(_manager_address_slot)), 0)
+      sstore(add(_white_listed_addresses_slot, proposed), 1)
+      sstore(_manager_address_slot, proposed)
+    }
   }
 
   #define CONSTRUCT(OWNER) \
