@@ -334,28 +334,32 @@ contract MarginSwap {
             wei_to_send := 0
           }
 
-          let result := call(
+          let res := call(
             gas, c_address, wei_to_send,
             m_in, m_in_size,
             m_out, 32
           )
 
+          if iszero(res) {
+            REVERT(106)
+          }
+
           switch returndatasize()
           /* called cEther */
           case 0 {
             if xor(c_address, cEther_addr) {
-              REVERT(106)
+              REVERT(107)
             }
           }
           /* called CErc20 */
           case 32 {
             if mload(m_out) {
-              REVERT(107)
+              REVERT(108)
             }
           }
           /* called Unknown */
           default {
-            REVERT(108)
+            REVERT(109)
           }
         }
       }

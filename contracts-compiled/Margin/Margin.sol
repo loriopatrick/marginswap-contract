@@ -226,22 +226,26 @@ contract MarginSwap {
             m_in_size := 36
             wei_to_send := 0
           }
-          let result := call(gas, c_address, wei_to_send, m_in, m_in_size, m_out, 32)
+          let res := call(gas, c_address, wei_to_send, m_in, m_in_size, m_out, 32)
+          if iszero(res) {
+            mstore(32, 106)
+            revert(63, 1)
+          }
           switch returndatasize
             case 0 {
               if xor(c_address, cEther_addr) {
-                mstore(32, 106)
+                mstore(32, 107)
                 revert(63, 1)
               }
             }
             case 32 {
               if mload(m_out) {
-                mstore(32, 107)
+                mstore(32, 108)
                 revert(63, 1)
               }
             }
             default {
-              mstore(32, 108)
+              mstore(32, 109)
               revert(63, 1)
             }
         }
