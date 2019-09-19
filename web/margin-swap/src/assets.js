@@ -30,6 +30,11 @@ module.exports = {
     symbol: 'WBTC',
     compound_address: '0x06e728d7907c164649427d2acfd4c81669d453bf',
   },
+  'ZRX': {
+    name: '0x Protocol',
+    symbol: 'ZRX',
+    compound_address: '0xdff375162cfe7d77473c1bec4560dede974e138c',
+  }
 };
 
 // main net

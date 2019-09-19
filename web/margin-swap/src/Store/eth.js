@@ -81,37 +81,141 @@ export default class EthManager {
       });
   }
 
-  _refreshBalances() {
+  _refreshMargin() {
+    const state = this._store.getState();
+    const margin_address = state.wallet.margin_address;
+
+    console.log(this._comptroller.getAccountLiquidity);
+    return this._comptroller.getAccountLiquidity(margin_address)
+      .then(res => {
+        const err = +res[0];
+        let liquidity = res[1];
+        let shortfall = res[2];
+
+        if (err) {
+          const e = new Error('failed to get account liquidity');
+          e.code = err;
+          throw e;
+        }
+
+        liquidity = Big(liquidity);
+        shortfall = Big(shortfall);
+
+        if (liquidity.eq(0)) {
+          return Big(0).sub(shortfall);
+        }
+
+        return liquidity;
+      })
+      .then(liquidity => {
+        Big.DP = 18;
+        liquidity = liquidity.div(Big(10).pow(Big.DP)).toFixed(Big.DP);
+        
+        this._store.dispatch({
+          type: 'set-liquidity',
+          liquidity,
+        });
+      });
+  }
+
+  _refreshAssets() {
+    const state = this._store.getState();
+    const margin_address = state.wallet.margin_address;
+    const new_assets = {};
+
+    return this._comptroller.getAssetsIn(margin_address).then(res => res[0]).then(assets_in => {
+      const assets_in_map = {};
+      assets_in.forEach(asset => {
+        assets_in_map[asset] = true;
+      });
+
+      const loads = Object.keys(ASSETS).map(symbol => {
+        const compound_address = ASSETS[symbol].compound_address;
+        const cToken = this._cToken(compound_address);
+
+        let asset_address;
+        let asset_price;
+        let supply_rate;
+        let borrow_rate;
+        let decimals;
+
+        return cToken.underlying().then(r => r[0])
+          .then(_asset_address => {
+            asset_address = _asset_address;
+
+            if (symbol === 'ETH') {
+              return 18;
+            }
+
+            return this._erc20(asset_address).decimals().then(r => r[0]);
+          })
+          .then(_decimals => {
+            decimals = +_decimals;
+            return this._oracle.getUnderlyingPrice(compound_address).then(r => r[0]);
+          })
+          .then(_asset_price => {
+            asset_price = _asset_price;
+            return cToken.borrowRatePerBlock().then(r => r[0]);
+          })
+          .then(_borrow_rate => {
+            borrow_rate = _borrow_rate;
+            return cToken.supplyRatePerBlock().then(r => r[0]);
+          })
+          .then(_supply_rate => {
+            supply_rate = _supply_rate;
+            return null;
+          })
+          .then(() => {
+            Big.DP = 18;
+            console.log(symbol,asset_price + '');
+            asset_price = Big(asset_price).div(Big(10).pow(Big.DP + 18 - decimals)).toFixed(Big.DP);
+
+            Big.DP = 18;
+            supply_rate = Big(supply_rate).mul(2102400)
+              .div(Big(10).pow(Big.DP)).toFixed(Big.DP);
+
+            Big.DP = 18;
+            borrow_rate = Big(borrow_rate).mul(2102400)
+              .div(Big(10).pow(Big.DP)).toFixed(Big.DP);
+
+            new_assets[symbol] = {
+              in_market: !!assets_in_map[compound_address],
+              compound_address,
+              asset_address,
+              asset_price,
+              supply_rate,
+              borrow_rate,
+              decimals,
+            };
+          });
+      });
+
+      return Promise.all(loads).then(() => {
+        this._store.dispatch({
+          type: 'set-assets',
+          assets: new_assets,
+        });
+
+        return new_assets;
+      });
+    });
+  }
+
+  _refreshBalances(assets) {
     const state = this._store.getState();
     const margin_address = state.wallet.margin_address;
 
     const new_balances = {};
 
-    const loads = Object.keys(ASSETS).map(symbol => {
-      const compound_address = ASSETS[symbol].compound_address;
-      const cToken = this._cToken(compound_address);
+    const loads = Object.keys(assets).map(symbol => {
+      const asset = assets[symbol];
+      const cToken = this._cToken(asset.compound_address);
 
-      let asset_address;
-      let asset_price;
-      let decimals;
       let compound_balance;
       let compound_rate;
       let borrow_balance;
 
-      return cToken.underlying().then(r => r[0])
-        .then(_asset_address => {
-          asset_address = _asset_address;
-
-          if (symbol === 'ETH') {
-            return 18;
-          }
-
-          return this._erc20(asset_address).decimals().then(r => r[0]);
-        })
-        .then(_decimals => {
-          decimals = +_decimals;
-          return cToken.balanceOf(margin_address).then(r => r[0]);
-        })
+      return cToken.balanceOf(margin_address).then(r => r[0])
         .then(_compound_balance => {
           compound_balance = _compound_balance;
           return cToken.exchangeRateStored().then(r => r[0]);
@@ -125,29 +229,19 @@ export default class EthManager {
           if (symbol === 'ETH') {
             return Big(10).pow(18).toFixed(0);
           }
-          return this._oracle.getUnderlyingPrice(compound_address).then(r => r[0]);
-        })
-        .then(_asset_price => {
-          asset_price = _asset_price;
           return null;
         })
         .then(() => {
-          Big.DP = decimals;
+          Big.DP = asset.decimals;
           borrow_balance = Big(borrow_balance).div(Big(10).pow(Big.DP)).toFixed(Big.DP);
 
-          Big.DP = decimals;
+          Big.DP = asset.decimals;
           compound_balance = Big(compound_balance).mul(compound_rate)
             .div(Big(10).pow(Big.DP + 18)).toFixed(Big.DP);
-
-          Big.DP = 18;
-          console.log(symbol,asset_price + '');
-          asset_price = Big(asset_price).div(Big(10).pow(Big.DP + 18 - decimals)).toFixed(Big.DP);
 
           new_balances[symbol] = {
             borrow_balance,
             compound_balance,
-            decimals,
-            asset_price,
           };
         });
     });
@@ -260,7 +354,9 @@ export default class EthManager {
             this._oracle = this._contract(ORACLE_ABI).at(oracle_address);
 
             setTimeout(() => {
-              this._refreshBalances();
+              this._refreshAssets()
+                .then(assets => this._refreshBalances(assets))
+                .then(() => this._refreshMargin());
             }, 100);
           });
         });

@@ -1,10 +1,23 @@
 const INIT_STATE = {
+  eth_price: '200',
   wallet: {
     has_web3: false,
     address: null,
     processing: null,
     margin_address: null,
     margin_setup: false,
+  },
+  assets: {
+    /*
+     * [asset_symbol]: {
+     *   compound_address,
+     *   asset_address,
+     *   decimals,
+     *   borrow_rate,
+     *   supply_rate,
+     *   ether_price,
+     * }
+     */
   },
   balances: {
     /*
@@ -13,7 +26,8 @@ const INIT_STATE = {
      *   borrow_balance: x,
      * }
      */
-  }
+  },
+  liquidity: null,
 };
 
 const reducer = (state = INIT_STATE, action) => {
@@ -22,6 +36,18 @@ const reducer = (state = INIT_STATE, action) => {
       return {
         ...state,
         balances: action.balances,
+      };
+    }
+    case 'set-assets': {
+      return {
+        ...state,
+        assets: action.assets,
+      };
+    }
+    case 'set-liquidity': {
+      return {
+        ...state,
+        liquidity: action.liquidity,
       };
     }
     case 'wallet-has3': {
