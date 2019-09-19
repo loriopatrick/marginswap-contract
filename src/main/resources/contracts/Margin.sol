@@ -137,7 +137,7 @@ contract MarginSwap {
         /* Step 2: register to lookup */
         {
           /* default to ETH address (0) */
-          mstore(mem_ptr, 0)
+          mstore(m_out, 0)
 
           if xor(cToken_addr, cEther_addr) {
             mstore(mem_ptr, fn_hash("underlying()"))

@@ -1,6 +1,4 @@
-export function accountLoading(state) {
-  return state.wallet.processing === 'auth' || state.account.loading;
-}
+const Big = require('big.js');
 
 const CACHE = {};
 
@@ -32,4 +30,19 @@ export function walletView(state) {
     margin_setup: wallet.margin_setup,
     loading: wallet.address && !wallet.margin_address,
   }));
+}
+
+export function balancesView(state) {
+  return viewCache('balances', state.balances, balances => {
+    const mapped = {};
+    Object.keys(balances).forEach(symbol => {
+      const b = balances[symbol];
+
+      mapped[symbol] = {
+        net_balance: Big(b.compound_balance).sub(b.borrow_balance).toFixed(b.decimals),
+      };
+    });
+
+    return mapped;
+  });
 }

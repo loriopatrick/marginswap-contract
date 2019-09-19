@@ -7,21 +7,23 @@ const INIT_STATE = {
     margin_setup: false,
   },
   balances: {
-    block_number: 0,
-    balances: {
-      /*
-       * [asset_symbol]: {
-       *   compound_balance: x,
-       *   compound_rate: x,
-       *   borrow_balance: x,
-       * }
-       */
-    },
+    /*
+     * [asset_symbol]: {
+     *   compound_balance: x,
+     *   borrow_balance: x,
+     * }
+     */
   }
 };
 
 const reducer = (state = INIT_STATE, action) => {
   switch (action.type) {
+    case 'set-balances': {
+      return {
+        ...state,
+        balances: action.balances,
+      };
+    }
     case 'wallet-has3': {
       return {
         ...state,

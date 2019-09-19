@@ -12,6 +12,10 @@ import {
   enterMarkets,
 } from 'Store/actions';
 
+import {
+  balancesView,
+} from 'Store/view';
+
 import assets from 'assets';
 import bat_img from 'img/assets/bat.svg';
 import dai_img from 'img/assets/dai.svg';
@@ -129,10 +133,14 @@ class App extends Component {
     };
 
     let account = asset => {
+      const balance = this.props.balances[asset.symbol] || { net_balance: '0' };
+
       return (
         <div className="account" key={asset.symbol}>
           <div className="asset"><img src={asset_images[asset.symbol]} /> {asset.symbol}</div>
-          <div className="amount green">+1.32</div>
+          <div className={'amount' + (+balance.net_balance >= 0 ? ' green' : ' red')}>
+            { balance.net_balance }
+          </div>
           <div className="actions">
             <div onClick={this.deposit.bind(this, asset.symbol)}>deposit</div>
             <div>withdraw</div>
@@ -179,4 +187,6 @@ class App extends Component {
   }
 }
 
-export default connect(() => {})(App);
+export default connect(state => ({
+  balances: balancesView(state),
+}))(App);

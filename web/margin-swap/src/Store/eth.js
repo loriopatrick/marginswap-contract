@@ -3,15 +3,18 @@ import EthContract from 'ethjs-contract';
 
 const MARGIN_PARENT_ABI = require('abi/MarginParent.json');
 const MARGIN_ABI = require('abi/MarginSwap.json');
+const COMPTROLLER_ABI = require('abi/Comptroller.json');
 const ERC20_ABI = require('abi/ERC20.json');
 const CTOKEN_ABI = require('abi/cToken.json');
+const ORACLE_ABI = require('abi/PriceOracle.json');
 
 // const MARGIN_PARENT_ADDRESS = '0x9e667a53dd12155fbffe061527d0395b39f27ecc'; // mainnet
-const MARGIN_PARENT_ADDRESS = '0xfe84e8d7e87a179704f8711473fce5ba84b10522'; // ropsten
+const MARGIN_PARENT_ADDRESS = '0xe8eb3c65c2de1b7b7244abb691e92c19001c282c'; // ropsten
+// const COMPTROLLER_ADDRESS = '0x3d9819210a31b4961b30ef54be2aed79b9c9cd3b'; // mainnet
+const COMPTROLLER_ADDRESS = '0xb081cf57b1e422b3e627544ec95992cbe8eaf9cb'; // ropsten
 
 
 const Big = require('big.js');
-
 const ASSETS = require('assets');
 
 export default class EthManager {
@@ -46,6 +49,7 @@ export default class EthManager {
             address: accounts[0],
           });
         });
+
       }
     }, 0);
   }
@@ -75,6 +79,86 @@ export default class EthManager {
         }
         return res;
       });
+  }
+
+  _refreshBalances() {
+    const state = this._store.getState();
+    const margin_address = state.wallet.margin_address;
+
+    const new_balances = {};
+
+    const loads = Object.keys(ASSETS).map(symbol => {
+      const compound_address = ASSETS[symbol].compound_address;
+      const cToken = this._cToken(compound_address);
+
+      let asset_address;
+      let asset_price;
+      let decimals;
+      let compound_balance;
+      let compound_rate;
+      let borrow_balance;
+
+      return cToken.underlying().then(r => r[0])
+        .then(_asset_address => {
+          asset_address = _asset_address;
+
+          if (symbol === 'ETH') {
+            return 18;
+          }
+
+          return this._erc20(asset_address).decimals().then(r => r[0]);
+        })
+        .then(_decimals => {
+          decimals = +_decimals;
+          return cToken.balanceOf(margin_address).then(r => r[0]);
+        })
+        .then(_compound_balance => {
+          compound_balance = _compound_balance;
+          return cToken.exchangeRateStored().then(r => r[0]);
+        })
+        .then(_compound_rate => {
+          compound_rate = _compound_rate;
+          return cToken.borrowBalanceStored(margin_address).then(r => r[0]);
+        })
+        .then(_borrow_balance => {
+          borrow_balance = _borrow_balance;
+          if (symbol === 'ETH') {
+            return Big(10).pow(18).toFixed(0);
+          }
+          return this._oracle.getUnderlyingPrice(compound_address).then(r => r[0]);
+        })
+        .then(_asset_price => {
+          asset_price = _asset_price;
+          return null;
+        })
+        .then(() => {
+          Big.DP = decimals;
+          borrow_balance = Big(borrow_balance).div(Big(10).pow(Big.DP)).toFixed(Big.DP);
+
+          Big.DP = decimals;
+          compound_balance = Big(compound_balance).mul(compound_rate)
+            .div(Big(10).pow(Big.DP + 18)).toFixed(Big.DP);
+
+          Big.DP = 18;
+          console.log(symbol,asset_price + '');
+          asset_price = Big(asset_price).div(Big(10).pow(Big.DP + 18 - decimals)).toFixed(Big.DP);
+
+          new_balances[symbol] = {
+            borrow_balance,
+            compound_balance,
+            decimals,
+            asset_price,
+          };
+        });
+    });
+
+    return Promise.all(loads).then(() => {
+      this._store.dispatch({
+        type: 'set-balances',
+        balances: new_balances,
+      });
+      console.log(new_balances);
+    });
   }
 
   _waitForTx(run_promise) {
@@ -169,10 +253,16 @@ export default class EthManager {
             margin_setup: res.enabled,
           });
 
-          console.log(res.margin_contract);
-
           this._margin = this._contract(MARGIN_ABI).at(res.margin_contract);
-          this._comptroller = this._contract(MARGIN_ABI).at('0x3d9819210a31b4961b30ef54be2aed79b9c9cd3b');
+          this._comptroller = this._contract(COMPTROLLER_ABI).at(COMPTROLLER_ADDRESS);
+
+          this._comptroller.oracle().then(r => r[0]).then(oracle_address => {
+            this._oracle = this._contract(ORACLE_ABI).at(oracle_address);
+
+            setTimeout(() => {
+              this._refreshBalances();
+            }, 100);
+          });
         });
         break;
       }
