@@ -137,6 +137,7 @@ export default class EthManager {
         let asset_price;
         let supply_rate;
         let borrow_rate;
+        let collateral_factor;
         let decimals;
 
         return cToken.underlying().then(r => r[0])
@@ -163,6 +164,10 @@ export default class EthManager {
           })
           .then(_supply_rate => {
             supply_rate = _supply_rate;
+            return this._comptroller.markets(compound_address).then(r => r[1]);
+          })
+          .then(_collateral_factor => {
+            collateral_factor = _collateral_factor;
             return null;
           })
           .then(() => {
@@ -178,6 +183,10 @@ export default class EthManager {
             borrow_rate = Big(borrow_rate).mul(2102400)
               .div(Big(10).pow(Big.DP)).toFixed(Big.DP);
 
+            Big.DP = 18;
+            collateral_factor = Big(collateral_factor)
+              .div(Big(10).pow(Big.DP)).toFixed(Big.DP);
+
             new_assets[symbol] = {
               in_market: !!assets_in_map[compound_address],
               compound_address,
@@ -185,6 +194,7 @@ export default class EthManager {
               asset_price,
               supply_rate,
               borrow_rate,
+              collateral_factor,
               decimals,
             };
           });

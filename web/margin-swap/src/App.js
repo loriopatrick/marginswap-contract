@@ -17,6 +17,7 @@ import {
   balancesView,
   marginView,
   interestView,
+  tradeView,
 } from 'Store/view';
 
 import assets from 'assets';
@@ -169,6 +170,16 @@ class App extends Component {
 
     const set = fn => e => dispatch({ type: 'set-trade', data: fn(e) });
 
+    let max_input = null;
+    if (is_input && !trade.loading) {
+      max_input = (
+        <div className="max-input"
+          onClick={set(() => ({ is_input_active: true, amount: trade.max_input }))}>
+          max: { trade.max_input }
+        </div>
+      );
+    }
+
     return (
       <div className={'input' + (is_input !== trade.is_input_active ? ' auto' : '')}>
         <div className="amount">
@@ -179,6 +190,7 @@ class App extends Component {
             onChange={set(e => ({ amount: e.target.value }))}
             value={trade.amount}
           />
+          { max_input }
           <div className="asset-select" onClick={this.selectAssetModal.bind(this, is_input)}>
             <img src={asset_images[asset_symbol]} /> { asset_symbol }
           </div>
@@ -284,5 +296,5 @@ export default connect(state => ({
   balances: balancesView(state),
   margin: marginView(state),
   interest: interestView(state),
-  trade: state.trade,
+  trade: tradeView(state),
 }))(App);

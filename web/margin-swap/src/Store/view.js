@@ -161,3 +161,66 @@ export function interestView(state) {
       };
     });
 }
+
+export function tradeView(state) {
+  const { from_asset, to_asset } = state.trade;
+
+  return viewCache('trade',
+    [ state.trade, state.assets[from_asset], state.assets[to_asset], state.liquidity ],
+    ([ trade, from_asset, to_asset, liquidity ]) => {
+
+      if (!from_asset || !to_asset || !liquidity) {
+        return {
+          ...trade,
+          loading: true,
+        };
+      }
+
+      /*
+       * OUTPUT * O_eth_value * O_collateral_factor + liquidity - INPUT * I_eth_value = 0
+       *
+       * SLIP = 0.9
+       *
+       * OUTPUT = INPUT * OUT/IN * SLIP
+       *
+       * X * O_eth_value (ETH/OUT) = ETH
+       *
+       * O_eth_value (ETH/OUT)
+       * I_eth_value (ETH/IN)
+       *
+       * OUT/IN => I_eth_value / O_eth_value
+       * OUTPUT = INPUT * I_eth_value / O_eth_value * SLIP
+       *
+       * (INPUT * I_eth_value / O_eth_value * SLIP) * O_eth_value * O_collateral_factor
+       *    + liquidity - INPUT * I_eth_value = 0
+       *
+       *
+       * (INPUT * I_eth_value * SLIP) * O_collateral_factor
+       *    + liquidity - INPUT * I_eth_value = 0
+       *
+       *
+       * INPUT * I_eth_value - (INPUT * I_eth_value * SLIP) * O_collateral_factor
+       *    = liquidity
+       *
+       *
+       * INPUT * I_eth_value * (1 - SLIP * O_collateral_factor) = liquidity
+       *
+       * INPUT = liquidity / (I_eth_value * (1 - SLIP * O_collateral_factor))
+       */
+
+      Big.DP = 18;
+      let max_input = Big(liquidity).div(
+        Big(from_asset.asset_price).mul(Big(1).sub(Big(0.9).mul(to_asset.collateral_factor)))
+      );
+
+      Big.RM = 0;
+      Big.NE = -10000000000000;
+      Big.PE = 10000000000000;
+      max_input = max_input.toPrecision(5);
+
+      return {
+        ...trade,
+        max_input,
+      };
+    });
+}
