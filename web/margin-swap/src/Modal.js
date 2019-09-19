@@ -23,9 +23,7 @@ class Modal extends Component {
   render() {
     return (
       <div className="Modal" onClick={this.closeModal.bind(this)} ref={ref => this._ref = ref}>
-        <div className="body">
-          { this.props.children }
-        </div>
+        { this.props.children }
       </div>
     );
   }

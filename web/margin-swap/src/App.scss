@@ -38,7 +38,7 @@
         flex-wrap: wrap;
         border-radius: 2px;
 
-        .input, .output {
+        .input {
           flex-basis: 50%;
           flex-grow: 1;
           box-sizing: border-box;
@@ -92,6 +92,7 @@
             }
 
             .asset-select {
+              user-select: none;
               position: absolute;
               bottom: 0;
               right: 0;

@@ -6,6 +6,7 @@ import { connect } from 'react-redux';
 import WalletStatus from 'Components/WalletStatus';
 import Spinner from 'Components/Spinner';
 import Modal from './Modal';
+import SelectAsset from './SelectAsset';
 
 import {
   marginDeposit,
@@ -26,12 +27,7 @@ class App extends Component {
     super(props);
 
     this.state = {
-      active_side: 'input',
-      input_amount: '',
-      output_amount: '',
-      input_asset: '',
-      output_asset: '',
-      value_loading: true,
+      select_asset_modal: false,
     };
   }
 
@@ -81,25 +77,6 @@ class App extends Component {
       }
     }
 
-    let side = side => {
-      return (
-        <div className={side + (side !== this.state.active_side ? ' auto' : '')}>
-          <div className="amount">
-            <label className="title" htmlFor={side}>{dict[side].title}</label>
-            <input type="text" id={side}
-              placeholder={dict[side].placeholder}
-              onFocus={this.selectSide.bind(this, side)}
-              onChange={this.updateInput.bind(this, side)}
-              value={dict[side].value}
-            />
-            <div className="asset-select">
-              <img src={asset_images.ETH} /> ETH
-            </div>
-          </div>
-        </div>
-      );
-    };
-
     let position = () => {
       return (
         <div className="position">
@@ -119,8 +96,26 @@ class App extends Component {
       );
     };
 
+    let modal = null;
+    if (this.state.select_asset_modal) {
+      const is_input = this.state.select_asset_is_input;
+      const { trade } = this.props;
+      const asset_symbol = is_input ? trade.from_asset : trade.to_asset;
+
+      modal = (
+        <Modal onClose={() => this.setState({ select_asset_modal: false })} >
+          <SelectAsset
+            title={is_input ? 'Select input asset' : 'Select output asset'}
+            selected={asset_symbol}
+            onSelect={this.selectAsset.bind(this, is_input)}
+          />
+        </Modal>
+      );
+    }
+
     return (
       <div className="App">
+        { modal }
         <div className="container">
           <header className="header">
             <span className="title">Margin Swap</span>
@@ -128,8 +123,8 @@ class App extends Component {
           </header>
           <div className="body">
             <div className="trade">
-              { side('input') }
-              { side('output') }
+              { this.renderInput(true) }
+              { this.renderInput(false) }
             </div>
             <div className="btn red" onClick={() => this.props.dispatch(enterMarkets())}>trade</div>
             <div className="data">
@@ -144,6 +139,54 @@ class App extends Component {
       </div>
     );
   }
+
+  selectAssetModal(is_input) {
+    this.setState({
+      select_asset_modal: true,
+      select_asset_is_input: is_input,
+    });
+  }
+
+  selectAsset(is_input, symbol) {
+    this.setState({
+      select_asset_modal: false,
+    });
+
+    this.props.dispatch({
+      type: 'set-trade',
+      data: {
+        [ is_input ? 'from_asset' : 'to_asset' ]: symbol,
+      },
+    });
+  }
+
+  renderInput(is_input) {
+    const { trade, dispatch } = this.props;
+
+    const id = 'input-' + is_input;
+    const title = is_input ? 'Input' : 'Output';
+    const asset_symbol = is_input ? trade.from_asset : trade.to_asset;
+
+    const set = fn => e => dispatch({ type: 'set-trade', data: fn(e) });
+
+    return (
+      <div className={'input' + (is_input !== trade.is_input_active ? ' auto' : '')}>
+        <div className="amount">
+          <label className="title" htmlFor={id}>{title}</label>
+          <input type="text" id={id}
+            placeholder={"0.0"}
+            onFocus={set(() => ({ is_input_active: is_input }))}
+            onChange={set(e => ({ amount: e.target.value }))}
+            value={trade.amount}
+          />
+          <div className="asset-select" onClick={this.selectAssetModal.bind(this, is_input)}>
+            <img src={asset_images[asset_symbol]} /> { asset_symbol }
+          </div>
+        </div>
+      </div>
+    );
+  }
+
 
   renderAccounts() {
     const { balances, margin, interest } = this.props;
@@ -186,7 +229,6 @@ class App extends Component {
     }
     else {
       accounts_el = balances.items.map(accountEl);
-      console.log(balances.items);
     }
 
     let margin_el = null;
@@ -242,4 +284,5 @@ export default connect(state => ({
   balances: balancesView(state),
   margin: marginView(state),
   interest: interestView(state),
+  trade: state.trade,
 }))(App);
