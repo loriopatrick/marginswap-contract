@@ -175,7 +175,6 @@ class App extends Component {
     );
   }
 
-
   renderAccounts() {
     const { balances, margin, interest } = this.props;
 
@@ -185,16 +184,16 @@ class App extends Component {
 
     const accountEl = asset => {
       if (!asset.in_market) {
-      return (
-        <div className="account" key={asset.symbol}>
-          <div className="asset"><img src={asset_images[asset.symbol]} /> {asset.symbol}</div>
-          <div className="amount">
+        return (
+          <div className="account" key={asset.symbol}>
+            <div className="asset"><img src={asset_images[asset.symbol]} /> {asset.symbol}</div>
+            <div className="amount">
+            </div>
+            <div className="actions">
+              <div>enable</div>
+            </div>
           </div>
-          <div className="actions">
-            <div>enable</div>
-          </div>
-        </div>
-      );
+        );
       }
 
       return (

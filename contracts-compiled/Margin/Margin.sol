@@ -91,7 +91,7 @@ contract MarginSwap {
         let mem_ptr := mload(0x40)
         let m_out := add(mem_ptr, 4)
         {
-          mstore(mem_ptr, 0)
+          mstore(m_out, 0)
           if xor(cToken_addr, cEther_addr) {
             mstore(mem_ptr, /* fn_hash("underlying()") */ 0x6f307dc300000000000000000000000000000000000000000000000000000000)
             let res := staticcall(gas, cToken_addr, mem_ptr, 4, m_out, 32)
