@@ -17,7 +17,7 @@ const INIT_STATE = {
      *   decimals,
      *   borrow_rate,
      *   supply_rate,
-     *   ether_price,
+     *   asset_price,
      *   collateral_factor,
      * }
      */

@@ -126,12 +126,12 @@ export function interestView(state) {
         const {
           supply_rate,
           borrow_rate,
+          asset_price,
         } = assets[symbol];
 
-        const pay = Big(borrow_balance).mul(borrow_rate);
-        const receive = Big(compound_balance).mul(supply_rate);
-
-        const value = Big(compound_balance).sub(borrow_balance).mul(eth_price);
+        const pay = Big(borrow_balance).mul(borrow_rate).mul(asset_price);
+        const receive = Big(compound_balance).mul(supply_rate).mul(asset_price);
+        const value = Big(compound_balance).sub(borrow_balance).mul(asset_price);
 
         if (value.gt(0)) {
           net_supply = net_supply.add(value);
@@ -148,7 +148,7 @@ export function interestView(state) {
         return {
           loading: false,
           paying: true,
-          amount: net_borrow.toFixed(2),
+          amount: net_borrow.mul(eth_price).toFixed(2),
           rate: year_revenue.div(net_borrow).mul(100).toFixed(2),
         };
       }
@@ -156,7 +156,7 @@ export function interestView(state) {
       return {
         loading: false,
         paying: false,
-        amount: net_supply.toFixed(2),
+        amount: net_supply.mul(eth_price).toFixed(2),
         rate: net_supply.eq(0) ? '0.00' : year_revenue.div(net_supply).mul(100).toFixed(2),
       };
     });

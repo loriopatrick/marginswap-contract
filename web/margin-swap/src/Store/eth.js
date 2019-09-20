@@ -508,51 +508,49 @@ export default class EthManager {
           min_output = Big(trade.amount).mul('0.95').mul(Big(10).pow(from.decimals)).toFixed(0);
         }
 
-        if (trade.is_input_active) {
-          if (from_symbol === 'ETH') {
-            return {
-              exchange_address: to.asset_address,
-              fn_name: 'ethToTokenSwapInput',
-              eth_value: input,
-              fn_args: [
-                min_output,
-                deadline,
-              ],
-              input,
+        if (from_symbol === 'ETH') {
+          return {
+            exchange_address: to.asset_address,
+            fn_name: 'ethToTokenSwapInput',
+            eth_value: input,
+            fn_args: [
               min_output,
-            };
-          }
+              deadline,
+            ],
+            input,
+            min_output,
+          };
+        }
 
-          if (to_symbol === 'ETH') {
-            return {
-              exchange_address: from.asset_address,
-              fn_name: 'tokenToEthSwapInput',
-              eth_value: '0',
-              fn_args: [
-                input,
-                min_output,
-                deadline,
-              ],
+        if (to_symbol === 'ETH') {
+          return {
+            exchange_address: from.asset_address,
+            fn_name: 'tokenToEthSwapInput',
+            eth_value: '0',
+            fn_args: [
               input,
               min_output,
-            }
+              deadline,
+            ],
+            input,
+            min_output,
           }
-          else {
-            return {
-              exchange_address: from.asset_address,
-              fn_name: 'tokenToTokenSwapInput',
-              eth_value: '0',
-              fn_args: [
-                input,
-                min_output,
-                /* min_eth_bought */ '0',
-                deadline,
-                to.asset_address,
-              ],
+        }
+        else {
+          return {
+            exchange_address: from.asset_address,
+            fn_name: 'tokenToTokenSwapInput',
+            eth_value: '0',
+            fn_args: [
               input,
               min_output,
-            };
-          }
+              /* min_eth_bought */ '0',
+              deadline,
+              to.asset_address,
+            ],
+            input,
+            min_output,
+          };
         }
       })
       .then(details => {

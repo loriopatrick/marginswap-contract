@@ -330,7 +330,7 @@ contract MarginSwap {
           if xor(c_address, cEther_addr) {
             mstore(m_in, fn_hash("mint(uint256)"))
             mstore(add(m_in, 4), amount)
-            m_in_size := 36
+            m_in_size := 0x24
             wei_to_send := 0
           }
 
@@ -443,8 +443,8 @@ contract MarginSwap {
 
           let res := call(
             gas, c_address, 0,
-            m_in, 36,
-            m_out, 32
+            m_in, 0x24,
+            m_out, 0x20
           )
 
           if or(iszero(res), mload(m_out)) {
@@ -549,7 +549,7 @@ contract MarginSwap {
                  address output_asset,
                  uint256 min_output_amount,
                  address trade_contract,
-                 bytes memory trade_data) public payable {
+                 bytes memory trade_data) public {
     uint256[3] memory m_in;
     uint256[1] memory m_out;
     uint256 output_amount;
@@ -588,17 +588,13 @@ contract MarginSwap {
 
       /* Step 2: Allow trade contract to use capital for trade */
       if input_asset {
-        /* only accept payment if using ETH as from */
-        if callvalue {
-          REVERT(3)
-        }
-
         APPROVE(input_asset, trade_contract, input_amount, /* REVERT(4) */ 4)
       }
 
       let before_balance := balance(address)
+
       if output_asset {
-        BALANCE_OF(output_asset, caller, /* REVERT(5) */ 5)
+        BALANCE_OF(output_asset, address, /* REVERT(5) */ 5)
         before_balance := mload(m_out)
       }
 
@@ -608,8 +604,13 @@ contract MarginSwap {
           REVERT(5)
         }
 
+        let wei_to_send := input_amount
+        if input_asset {
+          wei_to_send := 0
+        }
+
         let res := call(
-          gas, trade_contract, callvalue,
+          gas, trade_contract, wei_to_send,
           add(trade_data, 0x20), mload(trade_data),
           0, 0
         )
@@ -619,11 +620,13 @@ contract MarginSwap {
         }
       }
 
-      APPROVE(input_asset, trade_contract, 0, /* REVERT(8) */ 8)
+      if input_asset {
+        APPROVE(input_asset, trade_contract, 0, /* REVERT(8) */ 8)
+      }
 
       let after_balance := balance(address)
       if output_asset {
-        BALANCE_OF(output_asset, caller, /* REVERT(9) */ 9)
+        BALANCE_OF(output_asset, address, /* REVERT(9) */ 9)
         after_balance := mload(m_out)
       }
 

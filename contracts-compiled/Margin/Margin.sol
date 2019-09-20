@@ -223,7 +223,7 @@ contract MarginSwap {
           if xor(c_address, cEther_addr) {
             mstore(m_in, /* fn_hash("mint(uint256)") */ 0xa0712d6800000000000000000000000000000000000000000000000000000000)
             mstore(add(m_in, 4), amount)
-            m_in_size := 36
+            m_in_size := 0x24
             wei_to_send := 0
           }
           let res := call(gas, c_address, wei_to_send, m_in, m_in_size, m_out, 32)
@@ -309,7 +309,7 @@ contract MarginSwap {
         if remaining {
           mstore(m_in, /* fn_hash("borrow(uint256)") */ 0xc5ebeaec00000000000000000000000000000000000000000000000000000000)
           mstore(add(m_in, 4), remaining)
-          let res := call(gas, c_address, 0, m_in, 36, m_out, 32)
+          let res := call(gas, c_address, 0, m_in, 0x24, m_out, 0x20)
           if or(iszero(res), mload(m_out)) {
             mstore(32, 204)
             revert(63, 1)
@@ -384,7 +384,7 @@ contract MarginSwap {
                  address output_asset,
                  uint256 min_output_amount,
                  address trade_contract,
-                 bytes memory trade_data) public payable  {
+                 bytes memory trade_data) public  {
     
     uint256[3] memory m_in;
     
@@ -414,10 +414,6 @@ contract MarginSwap {
         }
       }
       if input_asset {
-        if callvalue {
-          mstore(32, 3)
-          revert(63, 1)
-        }
         {
           mstore(m_in, /* fn_hash("approve(address,uint256)") */ 0x095ea7b300000000000000000000000000000000000000000000000000000000)
           mstore(add(m_in, 4), trade_contract)
@@ -434,7 +430,7 @@ contract MarginSwap {
       if output_asset {
         {
           mstore(m_in, /* fn_hash("balanceOf(address)") */ 0x70a0823100000000000000000000000000000000000000000000000000000000)
-          mstore(add(m_in, 4), caller)
+          mstore(add(m_in, 4), address)
           mstore(m_out, 0)
           let res := staticcall(gas, output_asset, m_in, 0x24, m_out, 0x20)
           if iszero(res) {
@@ -449,28 +445,34 @@ contract MarginSwap {
           mstore(32, 5)
           revert(63, 1)
         }
-        let res := call(gas, trade_contract, callvalue, add(trade_data, 0x20), mload(trade_data), 0, 0)
+        let wei_to_send := input_amount
+        if input_asset {
+          wei_to_send := 0
+        }
+        let res := call(gas, trade_contract, wei_to_send, add(trade_data, 0x20), mload(trade_data), 0, 0)
         if iszero(res) {
           mstore(32, 7)
           revert(63, 1)
         }
       }
-      {
-        mstore(m_in, /* fn_hash("approve(address,uint256)") */ 0x095ea7b300000000000000000000000000000000000000000000000000000000)
-        mstore(add(m_in, 4), trade_contract)
-        mstore(add(m_in, 0x24), 0)
-        mstore(m_out, 0)
-        let res := call(gas, input_asset, 0, m_in, 0x44, m_out, 0x20)
-        if or(iszero(res), iszero(mload(m_out))) {
-          mstore(32, 8)
-          revert(63, 1)
+      if input_asset {
+        {
+          mstore(m_in, /* fn_hash("approve(address,uint256)") */ 0x095ea7b300000000000000000000000000000000000000000000000000000000)
+          mstore(add(m_in, 4), trade_contract)
+          mstore(add(m_in, 0x24), 0)
+          mstore(m_out, 0)
+          let res := call(gas, input_asset, 0, m_in, 0x44, m_out, 0x20)
+          if or(iszero(res), iszero(mload(m_out))) {
+            mstore(32, 8)
+            revert(63, 1)
+          }
         }
       }
       let after_balance := balance(address)
       if output_asset {
         {
           mstore(m_in, /* fn_hash("balanceOf(address)") */ 0x70a0823100000000000000000000000000000000000000000000000000000000)
-          mstore(add(m_in, 4), caller)
+          mstore(add(m_in, 4), address)
           mstore(m_out, 0)
           let res := staticcall(gas, output_asset, m_in, 0x24, m_out, 0x20)
           if iszero(res) {

@@ -86,7 +86,7 @@ contract CompoundMock {
       borrowBalanceCurrent[msg.sender] += amount;
 
       if (underlying == address(0x0)) {
-        require(msg.sender.send(amount));
+        msg.sender.transfer(amount);
       }
       else {
         CompoundMock erc20 = CompoundMock(underlying);
