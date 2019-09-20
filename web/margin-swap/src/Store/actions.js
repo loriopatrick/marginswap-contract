@@ -13,3 +13,12 @@ export function enterMarkets() {
 export function marginDeposit(symbol, amount) {
   return { type: 'trigger-margin-deposit', symbol, amount };
 }
+
+export function trade() {
+  return (dispatch, getState) => {
+    dispatch({
+      type: 'trigger-trade',
+      data: getState().trade,
+    });
+  };
+}

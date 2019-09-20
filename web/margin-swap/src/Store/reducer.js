@@ -51,16 +51,21 @@ const reducer = (state = INIT_STATE, action) => {
         ...action.data,
       };
 
-      if (amount !== undefined) {
+      let amount_updated = amount !== undefined;
+
+      if (state.trade.is_input_active !== updated_trade.is_input_active) {
+        updated_trade.amount = action.data.amount || state.trade.calculated || '';
+        amount_updated = true;
+      }
+
+      if (amount_updated) {
+        amount = updated_trade.amount;
         amount = amount
+          .replace(/\s/g, '')
           .replace(/[^0-9.]/g,'')
           .replace(/([0-9]*\.[0-9]*)\.+([0-9]*)/g, '$1$2');
 
         updated_trade.amount = amount;
-      }
-
-      if (state.trade.is_input_active !== updated_trade.is_input_active) {
-        updated_trade.amount = action.data.amount || state.trade.calculated || '';
       }
 
       /* flip assets so that they are not the same */

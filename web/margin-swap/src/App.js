@@ -11,6 +11,7 @@ import SelectAsset from './SelectAsset';
 import {
   marginDeposit,
   enterMarkets,
+  trade,
 } from 'Store/actions';
 
 import {
@@ -48,54 +49,6 @@ class App extends Component {
   }
 
   render() {
-    const dict = {
-      input: {
-        title: 'Input',
-        value: this.state.input_amount,
-        placeholder: '0.0',
-        cls: 'input',
-      },
-      output: {
-        title: 'Output',
-        value: this.state.output_amount,
-        placeholder: '0.0',
-        cls: 'output',
-      }
-    };
-
-    if (this.state.active_side === 'input') {
-      dict.output.cls += ' auto';
-
-      if (this.state.value_loading) {
-        dict.output.placeholder = 'loading...';
-      }
-    }
-    else {
-      dict.input.cls += ' auto';
-
-      if (this.state.value_loading) {
-        dict.input.placeholder = 'loading...';
-      }
-    }
-
-    let position = () => {
-      return (
-        <div className="position">
-          <div className="from">
-            1.321 <div className="asset"><img src={asset_images.ETH} /> ETH</div>
-          </div>
-          <div className="to">
-            1.321 <div className="asset"><img src={asset_images.ETH} /> ETH</div>
-          </div>
-          <div className="profit">
-            + 2.3%
-          </div>
-          <div className="state">
-            unrealized
-          </div>
-        </div>
-      );
-    };
 
     let modal = null;
     if (this.state.select_asset_modal) {
@@ -127,18 +80,41 @@ class App extends Component {
               { this.renderInput(true) }
               { this.renderInput(false) }
             </div>
-            <div className="btn red" onClick={() => this.props.dispatch(enterMarkets())}>trade</div>
+            <div className="btn red" onClick={() => this.props.dispatch(trade())}>
+              TRADE
+            </div>
             <div className="data">
               { this.renderAccounts() }
+      {/*
               <div className="positions">
                 { position() }
               </div>
+      */}
             </div>
 
           </div>
         </div>
       </div>
     );
+    //
+  //  let position = () => {
+  //    return (
+  //      <div className="position">
+  //        <div className="from">
+  //          1.321 <div className="asset"><img src={asset_images.ETH} /> ETH</div>
+  //        </div>
+  //        <div className="to">
+  //          1.321 <div className="asset"><img src={asset_images.ETH} /> ETH</div>
+  //        </div>
+  //        <div className="profit">
+  //          + 2.3%
+  //        </div>
+  //        <div className="state">
+  //          unrealized
+  //        </div>
+  //      </div>
+  //    );
+  //  };
   }
 
   selectAssetModal(is_input) {
@@ -167,7 +143,7 @@ class App extends Component {
     const data = is_input ? trade.input : trade.output; 
 
     const id = 'input-' + is_input;
-    const title = is_input ? 'Input' : 'Output';
+    const title = is_input ? 'Input' : 'Output (estimate)';
 
     const set = fn => e => dispatch({ type: 'set-trade', data: fn(e) });
 

@@ -263,7 +263,7 @@ export function tradeView(state) {
       }
 
       res.input.max = max_input;
-      res.input.max_selected = !Big(res.input.value || '0').lt(max_input);
+      res.input.max_selected = !Big(+res.input.value ? res.input.value : '0').lt(max_input);
 
       return res;
     });

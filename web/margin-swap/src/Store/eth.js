@@ -1,4 +1,5 @@
 import Eth from 'ethjs';
+import EthABI from 'ethjs-abi';
 import EthContract from 'ethjs-contract';
 import tradeCalcKey from './trade_calc_key';
 
@@ -9,10 +10,12 @@ const ERC20_ABI = require('abi/ERC20.json');
 const CTOKEN_ABI = require('abi/cToken.json');
 const ORACLE_ABI = require('abi/PriceOracle.json');
 const UNISWAP_FACTORY_ABI = require('abi/UniswapFactory.json');
+const UNISWAP_EXCHANGE_ABI = require('abi/UniswapExchange.json');
 
 const MARGIN_PARENT_ADDRESS = '0x9e667a53dd12155fbffe061527d0395b39f27ecc'; // mainnet
-// const MARGIN_PARENT_ADDRESS = '0xe8eb3c65c2de1b7b7244abb691e92c19001c282c'; // ropsten
 const COMPTROLLER_ADDRESS = '0x3d9819210a31b4961b30ef54be2aed79b9c9cd3b'; // mainnet
+
+// const MARGIN_PARENT_ADDRESS = '0xe8eb3c65c2de1b7b7244abb691e92c19001c282c'; // ropsten
 // const COMPTROLLER_ADDRESS = '0xb081cf57b1e422b3e627544ec95992cbe8eaf9cb'; // ropsten
 
 const UNISWAP_FACTORY_ADDRESS = '0xc0a47dFe034B400B47bDaD5FecDa2621de6c4d95';
@@ -96,7 +99,6 @@ export default class EthManager {
     const state = this._store.getState();
     const margin_address = state.wallet.margin_address;
 
-    console.log(this._comptroller.getAccountLiquidity);
     return this._comptroller.getAccountLiquidity(margin_address)
       .then(res => {
         const err = +res[0];
@@ -194,7 +196,6 @@ export default class EthManager {
           })
           .then(() => {
             Big.DP = 18;
-            console.log(symbol,asset_price + '');
             asset_price = Big(asset_price).div(Big(10).pow(Big.DP + 18 - decimals)).toFixed(Big.DP);
 
             Big.DP = 18;
@@ -283,7 +284,6 @@ export default class EthManager {
         type: 'set-balances',
         balances: new_balances,
       });
-      console.log(new_balances);
     });
   }
 
@@ -316,6 +316,10 @@ export default class EthManager {
 
   handle(action) {
     switch(action.type) {
+      case 'trigger-trade': {
+        this._uniswapTradeData(action.data).catch(e => {});
+        break;
+      }
       case 'trigger-wallet-connect': {
         this._run('Connecting', () => {
           return this._ethereum.enable();
@@ -331,7 +335,6 @@ export default class EthManager {
       }
 
       case 'trigger-enter-markets': {
-        console.log('here');
         this._run('Enter markets', address => this._margin.enterMarkets(
           Object.keys(ASSETS).map(s => ASSETS[s]).map(a => a.compound_address),
           { from: address }
@@ -363,8 +366,6 @@ export default class EthManager {
           return this._margin.deposit(asset_address, amount,
             { from: this._store.getState().wallet.address, value: wei_amount }
           );
-        }).then(res => {
-          console.log(res);
         });
 
         break;
@@ -450,6 +451,94 @@ export default class EthManager {
     return numerator.div(denominator).add(1);
   }
 
+  _uniswapTradeData(trade) {
+    if (!trade.calculated) {
+      return Promise.reject(new Error('calcualted not loaded yet'));
+    }
+
+    const state = this._store.getState();
+
+    const from_symbol = trade.from_asset;
+    const to_symbol = trade.to_asset;
+
+    const from = state.assets[from_symbol];
+    const to = state.assets[to_symbol];
+
+    /* todo, load current block and add delta */
+    const block_number = 10000000000;
+
+    return new Promise(resolve => resolve(block_number))
+      .then(deadline => {
+
+        let input = null;
+        let min_output = null;
+
+        if (trade.is_input_active) {
+          input = Big(trade.amount).mul(Big(10).pow(from.decimals)).toFixed(0);
+          min_output = Big(trade.calculated).mul('0.95').mul(Big(10).pow(to.decimals)).toFixed(0);
+        }
+        else {
+          input = Big(trade.calculated).mul(Big(10).pow(to.decimals)).toFixed(0);
+          min_output = Big(trade.amount).mul('0.95').mul(Big(10).pow(from.decimals)).toFixed(0);
+        }
+
+        if (trade.is_input_active) {
+          if (from_symbol === 'ETH') {
+            return {
+              exchange_address: to.asset_address,
+              fn_name: 'ethToTokenSwapInput',
+              eth_value: input,
+              fn_args: [
+                min_output,
+                deadline,
+              ],
+            };
+          }
+
+          if (to_symbol === 'ETH') {
+            return {
+              exchange_address: from.asset_address,
+              fn_name: 'tokenToEthSwapInput',
+              eth_value: '0',
+              fn_args: [
+                input,
+                min_output,
+                deadline,
+              ],
+            }
+          }
+          else {
+            return {
+              exchange_address: from.asset_address,
+              fn_name: 'tokenToTokenSwapInput',
+              eth_value: '0',
+              fn_args: [
+                input,
+                min_output,
+                /* min_eth_bought */ '0',
+                deadline,
+                to.asset_address,
+              ],
+            };
+          }
+        }
+      })
+      .then(details => {
+        const fn_abi = UNISWAP_EXCHANGE_ABI.find(a => a.name === details.fn_name);
+        const encoded = EthABI.encodeMethod(fn_abi, details.fn_args);
+
+        return {
+          trade_address: details.exchange_address,
+          trade_data: encoded,
+          eth_value: details.eth_value,
+        };
+      })
+      .then(res => {
+        console.log(res);
+        return res;
+      });
+  }
+
   _uniswapGetReserve(symbol) {
     if (symbol === 'ETH') {
       return Promise.resolve(null);
@@ -481,10 +570,8 @@ export default class EthManager {
 
   _calculateTrade(trade) {
     const state = this._store.getState();
-
     const from = state.assets[trade.from_asset];
     const to = state.assets[trade.to_asset];
-    const single_step = trade.from_asset === 'ETH' || trade.to_asset === 'ETH';
 
     return Promise.all([
       this._uniswapGetReserve(trade.from_asset),
