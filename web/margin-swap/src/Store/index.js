@@ -20,7 +20,9 @@ const web3_middle = store => {
 
     return action => {
       eth_manger && eth_manger.handle(action);
+      const before_state = store.getState();
       next(action);
+      eth_manger && eth_manger.postHandle(action, before_state);
     };
   };
 };

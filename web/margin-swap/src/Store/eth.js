@@ -1,5 +1,6 @@
 import Eth from 'ethjs';
 import EthContract from 'ethjs-contract';
+import tradeCalcKey from './trade_calc_key';
 
 const MARGIN_PARENT_ABI = require('abi/MarginParent.json');
 const MARGIN_ABI = require('abi/MarginSwap.json');
@@ -12,6 +13,8 @@ const ORACLE_ABI = require('abi/PriceOracle.json');
 const MARGIN_PARENT_ADDRESS = '0xe8eb3c65c2de1b7b7244abb691e92c19001c282c'; // ropsten
 // const COMPTROLLER_ADDRESS = '0x3d9819210a31b4961b30ef54be2aed79b9c9cd3b'; // mainnet
 const COMPTROLLER_ADDRESS = '0xb081cf57b1e422b3e627544ec95992cbe8eaf9cb'; // ropsten
+
+const EXCHANGE_ADDRESS = '0xc0a47dFe034B400B47bDaD5FecDa2621de6c4d95';
 
 
 const Big = require('big.js');
@@ -363,15 +366,127 @@ export default class EthManager {
           this._comptroller.oracle().then(r => r[0]).then(oracle_address => {
             this._oracle = this._contract(ORACLE_ABI).at(oracle_address);
 
-            setTimeout(() => {
-              this._refreshAssets()
-                .then(assets => this._refreshBalances(assets))
-                .then(() => this._refreshMargin());
-            }, 100);
+            if (res.enabled) {
+              setTimeout(() => {
+                this._refreshAssets()
+                  .then(assets => this._refreshBalances(assets))
+                  .then(() => this._refreshMargin());
+              }, 100);
+            }
           });
         });
         break;
       }
     }
+  }
+
+  postHandle(action, before_state) {
+    if (action.type !== 'set-trade') {
+      return;
+    }
+
+    const state = this._store.getState();
+
+    const calculate_key = tradeCalcKey(state.trade);
+    if (calculate_key === this._trade_calc_key) {
+      return;
+    }
+    this._trade_calc_key = calculate_key;
+
+    if (+state.trade.amount === 0) {
+      return this._store.dispatch({
+        type: 'trade-calculated',
+        key: calculate_key,
+        calculated: null,
+      });
+    }
+
+    clearTimeout(this._trade_calc_tid);
+
+    this._trade_calc_tid = setTimeout(() => {
+      this._calculateTrade(state.trade).then(calculated => {
+        this._store.dispatch({
+          type: 'trade-calculated',
+          key: calculate_key,
+          calculated,
+        });
+      });
+    }, 500);
+  }
+
+  _calculateTrade(trade) {
+    const state = this._store.getState();
+
+    const from = state.assets[trade.from_asset];
+    const to = state.assets[trade.to_asset];
+    const single_step = trade.from_asset === 'ETH' || trade.to_asset === 'ETH';
+
+    const eth_reserve = this._eth.getBalance(EXCHANGE_ADDRESS);
+    
+    const from_reserve = trade.from_asset === 'ETH'
+      ? eth_reserve
+      : this._erc20(from.asset_address).balanceOf(EXCHANGE_ADDRESS).then(r => r[0]);
+
+    const to_reserve = trade.to_asset === 'ETH'
+      ? eth_reserve
+      : this._erc20(to.asset_address).balanceOf(EXCHANGE_ADDRESS).then(r => r[0]);
+
+    return Promise.all([ from_reserve, to_reserve, eth_reserve ])
+      .then(([ input_reserve, output_reserve, eth_reserve ]) => {
+
+        if (trade.is_input_active) {
+          let mid_reserve = output_reserve;
+          if (!single_step) {
+            mid_reserve = eth_reserve;
+          }
+
+          const input_amount = Big(trade.amount).mul(Big(10).pow(from.decimals));
+          const numerator = input_amount.mul(mid_reserve).mul(997);
+          const denominator = input_amount.mul(997).add(Big(input_reserve).mul(1000));
+
+          Big.DP = 18;
+          const output_amount = numerator.div(denominator);
+
+          if (single_step) {
+            Big.DP = to.decimals;
+            return output_amount.div(Big(10).pow(Big.DP)).toFixed(Big.DP);
+          }
+
+          const numeratorB = output_amount.mul(output_reserve).mul(997);
+          const denominatorB = Big(mid_reserve).mul(1000).add(output_amount.mul(997));
+
+          Big.DP = 18;
+          const output_amount_b = denominatorB.eq(0) ? Big(0) : numeratorB.div(denominatorB);
+
+          Big.DP = to.decimals;
+          return output_amount_b.div(Big(10).pow(Big.DP)).toFixed(Big.DP);
+        }
+        else {
+          let mid_reserve = input_reserve;
+          if (!single_step) {
+            mid_reserve = eth_reserve;
+          }
+
+          const output_amount = Big(trade.amount).mul(Big(10).pow(to.decimals));
+
+          const numerator = output_amount.mul(mid_reserve).mul(1000);
+          const denominator = Big(output_reserve).sub(output_amount).mul(997);
+
+          Big.DP = 18;
+          const input_amount = numerator.div(denominator).add(1);
+
+          if (single_step) {
+            Big.DP = from.decimals;
+            return input_amount.div(Big(10).pow(Big.DP)).toFixed(Big.DP);
+          }
+
+          const numeratorA = input_amount.mul(input_reserve).mul(1000);
+          const denominatorA = Big(mid_reserve).sub(input_amount).mul(997);
+
+          Big.DP = 18;
+          const input_amount_a = denominatorA.eq(0) ? Big(0) : numeratorA.div(denominatorA).add(1);
+          return input_amount_a.div(Big(10).pow(Big.DP)).toFixed(Big.DP);
+        }
+      });
   }
 }

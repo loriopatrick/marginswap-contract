@@ -128,6 +128,11 @@
               font-weight: normal;
               font-size: $font-size * 0.75;
               padding: $input-padding / 2 $input-padding;
+
+              &.active {
+                background: mix($background, $red);
+                border-color: $red;
+              }
             }
           }
         }

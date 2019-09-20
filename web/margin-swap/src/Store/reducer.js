@@ -1,3 +1,5 @@
+import tradeCalcKey from './trade_calc_key';
+
 const INIT_STATE = {
   eth_price: '200',
   wallet: {
@@ -28,17 +30,14 @@ const INIT_STATE = {
      * }
      */
   },
-  reserves: {
-    /*
-     * [asset_symbol]: TokenReservesNormalized
-     */
-  },
   liquidity: null,
   trade: {
     from_asset: 'DAI',
     to_asset: 'ETH',
     amount: '',
     is_input_active: true,
+    max_input: '',
+    calculated: null,
   }
 };
 
@@ -60,6 +59,10 @@ const reducer = (state = INIT_STATE, action) => {
         updated_trade.amount = amount;
       }
 
+      if (state.trade.is_input_active !== updated_trade.is_input_active) {
+        updated_trade.amount = action.data.amount || state.trade.calculated || '';
+      }
+
       /* flip assets so that they are not the same */
       if (updated_trade.from_asset === updated_trade.to_asset) {
         if (state.trade.from_asset !== updated_trade.from_asset) {
@@ -70,9 +73,26 @@ const reducer = (state = INIT_STATE, action) => {
         }
       }
 
+      if (tradeCalcKey(updated_trade) !== tradeCalcKey(state.trade)) {
+        updated_trade.calculated = null;
+      }
+
       return {
         ...state,
         trade: updated_trade,
+      };
+    }
+    case 'trade-calculated': {
+      if (tradeCalcKey(state.trade) !== action.key) {
+        return state;
+      }
+
+      return {
+        ...state,
+        trade: {
+          ...state.trade,
+          calculated: action.calculated,
+        },
       };
     }
     case 'set-balances': {

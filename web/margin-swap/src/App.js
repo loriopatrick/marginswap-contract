@@ -164,18 +164,19 @@ class App extends Component {
   renderInput(is_input) {
     const { trade, dispatch } = this.props;
 
+    const data = is_input ? trade.input : trade.output; 
+
     const id = 'input-' + is_input;
     const title = is_input ? 'Input' : 'Output';
-    const asset_symbol = is_input ? trade.from_asset : trade.to_asset;
 
     const set = fn => e => dispatch({ type: 'set-trade', data: fn(e) });
 
-    let max_input = null;
-    if (is_input && !trade.loading) {
-      max_input = (
-        <div className="max-input"
-          onClick={set(() => ({ is_input_active: true, amount: trade.max_input }))}>
-          max: { trade.max_input }
+    let max_el = null;
+    if (data.max && !trade.loading) {
+      max_el = (
+        <div className={'max-input' + (data.max_selected ? ' active' : '')}
+          onClick={set(() => ({ is_input_active: true, amount: data.max }))}>
+          max: { data.max }
         </div>
       );
     }
@@ -185,14 +186,13 @@ class App extends Component {
         <div className="amount">
           <label className="title" htmlFor={id}>{title}</label>
           <input type="text" id={id}
-            placeholder={"0.0"}
-            onFocus={set(() => ({ is_input_active: is_input }))}
-            onChange={set(e => ({ amount: e.target.value }))}
-            value={trade.amount}
+            placeholder={data.placeholder}
+            onChange={set(e => ({ is_input_active: is_input, amount: e.target.value }))}
+            value={data.value}
           />
-          { max_input }
+          { max_el }
           <div className="asset-select" onClick={this.selectAssetModal.bind(this, is_input)}>
-            <img src={asset_images[asset_symbol]} /> { asset_symbol }
+            <img src={asset_images[data.symbol]} /> { data.symbol }
           </div>
         </div>
       </div>

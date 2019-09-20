@@ -167,12 +167,23 @@ export function tradeView(state) {
 
   return viewCache('trade',
     [ state.trade, state.assets[from_asset], state.assets[to_asset], state.liquidity ],
-    ([ trade, from_asset, to_asset, liquidity ]) => {
+    ([ trade, from, to, liquidity ]) => {
 
-      if (!from_asset || !to_asset || !liquidity) {
+      if (!from || !to || !liquidity) {
         return {
-          ...trade,
           loading: true,
+          input: {
+            symbol: from_asset,
+            value: '',
+            placeholder: '0.0',
+            loading: false,
+          },
+          output: {
+            symbol: to_asset,
+            value: '',
+            placeholder: '0.0',
+            loading: false,
+          }
         };
       }
 
@@ -210,7 +221,7 @@ export function tradeView(state) {
 
       Big.DP = 18;
       let max_input = Big(liquidity).div(
-        Big(from_asset.asset_price).mul(Big(1).sub(Big(0.9).mul(to_asset.collateral_factor)))
+        Big(from.asset_price).mul(Big(1).sub(Big(0.9).mul(to.collateral_factor)))
       );
 
       Big.RM = 0;
@@ -218,9 +229,42 @@ export function tradeView(state) {
       Big.PE = 10000000000000;
       max_input = max_input.toPrecision(5);
 
-      return {
-        ...trade,
-        max_input,
+      const res = {
+        from_asset,
+        to_asset,
+        is_input_active: trade.is_input_active,
       };
+
+      if (trade.is_input_active) {
+        res.input = {
+          symbol: from_asset,
+          value: trade.amount,
+          placeholder: '0.0',
+        };
+
+        res.output = {
+          symbol: to_asset,
+          value: '',
+          placeholder: +trade.amount && !trade.calculated ? 'loading' : (trade.calculated || '0.0'),
+        };
+      }
+      else {
+        res.output = {
+          symbol: to_asset,
+          value: trade.amount,
+          placeholder: '0.0',
+        };
+
+        res.input = {
+          symbol: from_asset,
+          value: '',
+          placeholder: +trade.amount && !trade.calculated ? 'loading' : (trade.calculated || '0.0'),
+        };
+      }
+
+      res.input.max = max_input;
+      res.input.max_selected = !Big(res.input.value || '0').lt(max_input);
+
+      return res;
     });
 }
