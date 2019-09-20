@@ -157,7 +157,7 @@ export function interestView(state) {
         loading: false,
         paying: false,
         amount: net_supply.toFixed(2),
-        rate: year_revenue.div(net_supply).mul(100).toFixed(2),
+        rate: net_supply.eq(0) ? '0.00' : year_revenue.div(net_supply).mul(100).toFixed(2),
       };
     });
 }

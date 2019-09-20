@@ -8,14 +8,14 @@ const COMPTROLLER_ABI = require('abi/Comptroller.json');
 const ERC20_ABI = require('abi/ERC20.json');
 const CTOKEN_ABI = require('abi/cToken.json');
 const ORACLE_ABI = require('abi/PriceOracle.json');
+const UNISWAP_FACTORY_ABI = require('abi/UniswapFactory.json');
 
-// const MARGIN_PARENT_ADDRESS = '0x9e667a53dd12155fbffe061527d0395b39f27ecc'; // mainnet
-const MARGIN_PARENT_ADDRESS = '0xe8eb3c65c2de1b7b7244abb691e92c19001c282c'; // ropsten
-// const COMPTROLLER_ADDRESS = '0x3d9819210a31b4961b30ef54be2aed79b9c9cd3b'; // mainnet
-const COMPTROLLER_ADDRESS = '0xb081cf57b1e422b3e627544ec95992cbe8eaf9cb'; // ropsten
+const MARGIN_PARENT_ADDRESS = '0x9e667a53dd12155fbffe061527d0395b39f27ecc'; // mainnet
+// const MARGIN_PARENT_ADDRESS = '0xe8eb3c65c2de1b7b7244abb691e92c19001c282c'; // ropsten
+const COMPTROLLER_ADDRESS = '0x3d9819210a31b4961b30ef54be2aed79b9c9cd3b'; // mainnet
+// const COMPTROLLER_ADDRESS = '0xb081cf57b1e422b3e627544ec95992cbe8eaf9cb'; // ropsten
 
-const EXCHANGE_ADDRESS = '0xc0a47dFe034B400B47bDaD5FecDa2621de6c4d95';
-
+const UNISWAP_FACTORY_ADDRESS = '0xc0a47dFe034B400B47bDaD5FecDa2621de6c4d95';
 
 const Big = require('big.js');
 const ASSETS = require('assets');
@@ -36,23 +36,31 @@ export default class EthManager {
         this._eth = new Eth(ethereum);
         this._contract = new EthContract(this._eth);
         this._margin_parent = this._contract(MARGIN_PARENT_ABI).at(MARGIN_PARENT_ADDRESS);
+        this._comptroller = this._contract(COMPTROLLER_ABI).at(COMPTROLLER_ADDRESS);
+        this._uniswap_factory = this._contract(UNISWAP_FACTORY_ABI).at(UNISWAP_FACTORY_ADDRESS);
+        this._comptroller.oracle().then(r => r[0]).then(oracle_address => {
+          if (oracle_address === '0x') {
+            throw new Error('got invalid oracle_address');
+          }
+          this._oracle = this._contract(ORACLE_ABI).at(oracle_address);
+          return this._refreshAssets();
+        }).then(() => {
+          dispatch({ type: 'wallet-has3' });
 
-        dispatch({ type: 'wallet-has3' });
+          if (ethereum.selectedAddress) {
+            dispatch({
+              type: 'wallet-address',
+              address: ethereum.selectedAddress,
+            });
+          }
 
-        if (ethereum.selectedAddress) {
-          dispatch({
-            type: 'wallet-address',
-            address: ethereum.selectedAddress,
-          });
-        }
-
-        ethereum.on('accountsChanged', accounts => {
-          dispatch({
-            type: 'wallet-address',
-            address: accounts[0],
+          ethereum.on('accountsChanged', accounts => {
+            dispatch({
+              type: 'wallet-address',
+              address: accounts[0],
+            });
           });
         });
-
       }
     }, 0);
   }
@@ -121,10 +129,13 @@ export default class EthManager {
       });
   }
 
-  _refreshAssets() {
+  _getAssetsIn() {
     const state = this._store.getState();
     const margin_address = state.wallet.margin_address;
-    const new_assets = {};
+
+    if (!margin_address) {
+      return Promise.resolve({});
+    }
 
     return this._comptroller.getAssetsIn(margin_address).then(res => res[0]).then(assets_in => {
       const assets_in_map = {};
@@ -132,6 +143,14 @@ export default class EthManager {
         assets_in_map[asset] = true;
       });
 
+      return assets_in_map;
+    });
+  }
+
+  _refreshAssets() {
+    const new_assets = {};
+
+    return this._getAssetsIn().then(assets_in_map => {
       const loads = Object.keys(ASSETS).map(symbol => {
         const compound_address = ASSETS[symbol].compound_address;
         const cToken = this._cToken(compound_address);
@@ -414,6 +433,52 @@ export default class EthManager {
     }, 500);
   }
 
+  _uniswapExactInput(input_reserve, output_reserve, input_amount) {
+    const numerator = Big(input_amount).mul(output_reserve).mul(997);
+    const denominator = Big(input_reserve).mul(1000).add(Big(input_amount).mul(997));
+    Big.DP = 0;
+    Big.RM = 0;
+    return numerator.div(denominator);
+  }
+
+  _uniswapExactOutput(input_reserve, output_reserve, output_amount) {
+    const numerator = Big(output_amount).mul(input_reserve).mul(1000);
+    const denominator = Big(output_reserve).sub(output_amount).mul(997);
+
+    Big.DP = 0;
+    Big.RM = 0;
+    return numerator.div(denominator).add(1);
+  }
+
+  _uniswapGetReserve(symbol) {
+    if (symbol === 'ETH') {
+      return Promise.resolve(null);
+    }
+
+    const state = this._store.getState();
+    const { asset_address } = state.assets[symbol];
+
+    return this._uniswap_factory
+      .getExchange(asset_address).then(r => r[0])
+      .then(exchange_address => {
+        if (exchange_address === '0x') {
+          throw new Error('exchange does not exist for ' + symbol);
+        }
+
+        return Promise.all([
+          this._eth.getBalance(exchange_address),
+          this._erc20(asset_address).balanceOf(exchange_address).then(r => r[0]),
+        ]).then(([eth_balance, token_balance]) => {
+          return {
+            exchange_address,
+            eth_balance,
+            token_balance,
+          };
+        });
+      });
+  }
+
+
   _calculateTrade(trade) {
     const state = this._store.getState();
 
@@ -421,72 +486,75 @@ export default class EthManager {
     const to = state.assets[trade.to_asset];
     const single_step = trade.from_asset === 'ETH' || trade.to_asset === 'ETH';
 
-    const eth_reserve = this._eth.getBalance(EXCHANGE_ADDRESS);
-    
-    const from_reserve = trade.from_asset === 'ETH'
-      ? eth_reserve
-      : this._erc20(from.asset_address).balanceOf(EXCHANGE_ADDRESS).then(r => r[0]);
+    return Promise.all([
+      this._uniswapGetReserve(trade.from_asset),
+      this._uniswapGetReserve(trade.to_asset),
+    ]).then(([from_reserve, to_reserve]) => {
 
-    const to_reserve = trade.to_asset === 'ETH'
-      ? eth_reserve
-      : this._erc20(to.asset_address).balanceOf(EXCHANGE_ADDRESS).then(r => r[0]);
+      if (trade.is_input_active) {
+        let eth_input = null;
 
-    return Promise.all([ from_reserve, to_reserve, eth_reserve ])
-      .then(([ input_reserve, output_reserve, eth_reserve ]) => {
-
-        if (trade.is_input_active) {
-          let mid_reserve = output_reserve;
-          if (!single_step) {
-            mid_reserve = eth_reserve;
-          }
-
-          const input_amount = Big(trade.amount).mul(Big(10).pow(from.decimals));
-          const numerator = input_amount.mul(mid_reserve).mul(997);
-          const denominator = input_amount.mul(997).add(Big(input_reserve).mul(1000));
-
-          Big.DP = 18;
-          const output_amount = numerator.div(denominator);
-
-          if (single_step) {
-            Big.DP = to.decimals;
-            return output_amount.div(Big(10).pow(Big.DP)).toFixed(Big.DP);
-          }
-
-          const numeratorB = output_amount.mul(output_reserve).mul(997);
-          const denominatorB = Big(mid_reserve).mul(1000).add(output_amount.mul(997));
-
-          Big.DP = 18;
-          const output_amount_b = denominatorB.eq(0) ? Big(0) : numeratorB.div(denominatorB);
-
-          Big.DP = to.decimals;
-          return output_amount_b.div(Big(10).pow(Big.DP)).toFixed(Big.DP);
+        /* FROM => eth_input */
+        if (from_reserve === null) {
+          /* from asset is eth, so just copy amount */
+          eth_input = Big(trade.amount).mul(Big(10).pow(18));
         }
         else {
-          let mid_reserve = input_reserve;
-          if (!single_step) {
-            mid_reserve = eth_reserve;
-          }
+          const input_amount = Big(trade.amount).mul(Big(10).pow(from.decimals));
+          eth_input = this._uniswapExactInput(
+            from_reserve.token_balance,
+            from_reserve.eth_balance,
+            input_amount
+          );
+        }
 
+        /* eth_input => TO */
+        if (to_reserve === null) {
+          Big.DP = 18;
+          return eth_input.div(Big(10).pow(Big.DP)).toFixed(Big.DP);
+        }
+
+        const output_amount = this._uniswapExactInput(
+          to_reserve.eth_balance,
+          to_reserve.token_balance,
+          eth_input
+        );
+
+        Big.DP = to.decimals;
+        return output_amount.div(Big(10).pow(Big.DP)).toFixed(Big.DP);
+      }
+      else {
+        /* TO <= eth_output */
+        let eth_output = null;
+
+        if (to_reserve === null) {
+          eth_output = Big(trade.amount).mul(Big(10).pow(18));
+        }
+        else {
           const output_amount = Big(trade.amount).mul(Big(10).pow(to.decimals));
 
-          const numerator = output_amount.mul(mid_reserve).mul(1000);
-          const denominator = Big(output_reserve).sub(output_amount).mul(997);
-
-          Big.DP = 18;
-          const input_amount = numerator.div(denominator).add(1);
-
-          if (single_step) {
-            Big.DP = from.decimals;
-            return input_amount.div(Big(10).pow(Big.DP)).toFixed(Big.DP);
-          }
-
-          const numeratorA = input_amount.mul(input_reserve).mul(1000);
-          const denominatorA = Big(mid_reserve).sub(input_amount).mul(997);
-
-          Big.DP = 18;
-          const input_amount_a = denominatorA.eq(0) ? Big(0) : numeratorA.div(denominatorA).add(1);
-          return input_amount_a.div(Big(10).pow(Big.DP)).toFixed(Big.DP);
+          eth_output = this._uniswapExactOutput(
+            to_reserve.eth_balance,
+            to_reserve.token_balance,
+            output_amount
+          );
         }
-      });
+
+        /* FROM => eth_output */
+        if (from_reserve === null) {
+          Big.DP = 18;
+          return eth_output.div(Big(10).pow(Big.DP)).toFixed(Big.DP);
+        }
+
+        const input_amount = this._uniswapExactOutput(
+          from_reserve.token_balance,
+          from_reserve.eth_balance,
+          eth_output
+        );
+
+        Big.DP = from.decimals;
+        return input_amount.div(Big(10).pow(Big.DP)).toFixed(Big.DP);
+      }
+    });
   }
 }
