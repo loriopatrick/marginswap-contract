@@ -7,6 +7,7 @@ import WalletStatus from 'Components/WalletStatus';
 import Spinner from 'Components/Spinner';
 import Modal from './Modal';
 import SelectAsset from './SelectAsset';
+import EnableAssets from './EnableAssets';
 
 import {
   marginDeposit,
@@ -30,6 +31,7 @@ class App extends Component {
 
     this.state = {
       select_asset_modal: false,
+      enable_assets_modal: false,
     };
   }
 
@@ -45,11 +47,10 @@ class App extends Component {
     const asset = assets[symbol];
     console.log(asset);
 
-    this.props.dispatch(marginDeposit(symbol, '0.1'));
+    this.props.dispatch(marginDeposit(symbol, '0.01'));
   }
 
   render() {
-
     let modal = null;
     if (this.state.select_asset_modal) {
       const is_input = this.state.select_asset_is_input;
@@ -66,6 +67,15 @@ class App extends Component {
         </Modal>
       );
     }
+
+    if (this.state.enable_assets_modal) {
+      modal = (
+        <Modal onClose={() => this.setState({ enable_assets_modal: false })} >
+          <EnableAssets />
+        </Modal>
+      );
+    }
+
 
     return (
       <div className="App">
@@ -190,7 +200,7 @@ class App extends Component {
             <div className="amount">
             </div>
             <div className="actions">
-              <div>enable</div>
+              <div onClick={() => this.setState({ enable_assets_modal: true })}>enable</div>
             </div>
           </div>
         );

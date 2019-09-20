@@ -26,13 +26,10 @@ class SelectAsset extends Component {
     });
 
     return (
-      <React.Fragment>
-        <div className="spacer"></div>
-        <div className="SelectAsset">
-          <div className="title">{ this.props.title || 'Select an asset' }</div>
-          { asset_els }
-        </div>
-      </React.Fragment>
+      <div className="SelectAsset">
+        <div className="title">{ this.props.title || 'Select an asset' }</div>
+        { asset_els }
+      </div>
     );
   }
 }

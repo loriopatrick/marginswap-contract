@@ -169,6 +169,7 @@ export default class EthManager {
             asset_address = _asset_address;
 
             if (symbol === 'ETH') {
+              asset_address = '0x0000000000000000000000000000000000000000';
               return 18;
             }
 
@@ -317,7 +318,32 @@ export default class EthManager {
   handle(action) {
     switch(action.type) {
       case 'trigger-trade': {
-        this._uniswapTradeData(action.data).catch(e => {});
+        const state = this._store.getState();
+        const trade_data = action.data;
+
+        this._uniswapTradeData(trade_data).then(data => {
+          /*
+           function trade(address input_asset,
+                 uint256 input_amount,
+                 address output_asset,
+                 uint256 min_output_amount,
+                 address trade_contract,
+                 bytes memory trade_data) 
+           */
+
+          debugger;
+          return this._margin.trade(
+            state.assets[trade_data.from_asset].asset_address,
+            data.input,
+            state.assets[trade_data.to_asset].asset_address,
+            data.min_output,
+            data.trade_address,
+            data.trade_data,
+            { from: state.wallet.address }
+          );
+        }).then(res => {
+          console.log(res);
+        });
         break;
       }
       case 'trigger-wallet-connect': {
@@ -334,9 +360,9 @@ export default class EthManager {
         break;
       }
 
-      case 'trigger-enter-markets': {
-        this._run('Enter markets', address => this._margin.enterMarkets(
-          Object.keys(ASSETS).map(s => ASSETS[s]).map(a => a.compound_address),
+      case 'trigger-enable-assets': {
+        this._run('Enable assets', address => this._margin.enterMarkets(
+          action.assets.map(s => ASSETS[s]).map(a => a.compound_address),
           { from: address }
         ));
         break;
@@ -492,6 +518,8 @@ export default class EthManager {
                 min_output,
                 deadline,
               ],
+              input,
+              min_output,
             };
           }
 
@@ -505,6 +533,8 @@ export default class EthManager {
                 min_output,
                 deadline,
               ],
+              input,
+              min_output,
             }
           }
           else {
@@ -519,6 +549,8 @@ export default class EthManager {
                 deadline,
                 to.asset_address,
               ],
+              input,
+              min_output,
             };
           }
         }
@@ -528,10 +560,19 @@ export default class EthManager {
         const encoded = EthABI.encodeMethod(fn_abi, details.fn_args);
 
         return {
-          trade_address: details.exchange_address,
+          trade_asset_address: details.exchange_address,
           trade_data: encoded,
           eth_value: details.eth_value,
+          input: details.input,
+          min_output: details.min_output,
         };
+      })
+      .then(res => {
+        return this._uniswap_factory.getExchange(res.trade_asset_address).then(r => r[0])
+          .then(trade_address => {
+            res.trade_address = trade_address;
+            return res;
+          });
       })
       .then(res => {
         console.log(res);

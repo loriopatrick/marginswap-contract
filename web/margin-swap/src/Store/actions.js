@@ -14,6 +14,10 @@ export function marginDeposit(symbol, amount) {
   return { type: 'trigger-margin-deposit', symbol, amount };
 }
 
+export function enableAssets(assets) {
+  return { type: 'trigger-enable-assets', assets, };
+}
+
 export function trade() {
   return (dispatch, getState) => {
     dispatch({

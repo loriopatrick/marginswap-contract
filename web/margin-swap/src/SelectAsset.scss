@@ -52,5 +52,13 @@
     &.active {
       border-color: $green;
     }
+
+    &.selected {
+      border-color: $blue;
+
+      &:hover {
+        border-color: $red;
+      }
+    }
   }
 }
