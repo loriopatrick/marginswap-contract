@@ -6,28 +6,88 @@ pragma solidity ^0.5.7;
 
 contract MarginParent {
   bytes constant _margin_swap_compiled = hex"
-  #include "../../../../contracts-compiled/Margin/MarginSwap.bin"
+  #include "../../../../contracts-compiled/MarginProxy/MarginProxy.bin"
   ";
 
   address _manager_address;
   address _manager_proposed;
+  address _default_code;
 
-  address _comptroller_address;
-  address _cEther_address;
   uint256[2**160] _white_listed_addresses;
+  uint256[2**160] _approved_margin_code;
 
-  address public _last_create_address;
+  event MarginSetup(
+    address indexed owner,
+    address margin_address
+  );
 
-  constructor(address comptroller_address, address cEther_address) public payable {
+  constructor(address default_code) public payable {
     assembly {
-      sstore(_comptroller_address_slot, comptroller_address)
-      sstore(_cEther_address_slot, cEther_address)
       sstore(_manager_address_slot, caller)
+      sstore(_default_code_slot, default_code)
       sstore(add(_white_listed_addresses_slot, caller), 1)
     }
   }
 
   function() external payable {
+  }
+
+  /* allows manager to approve new margin code */
+  function approveMarginCode(address margin_code_address, bool approved) external {
+    assembly {
+      /* ensure caller is manager */
+      if xor(caller, sload(_manager_address_slot)) {
+        REVERT(1)
+      }
+
+      sstore(add(_approved_margin_code_slot, margin_code_address), approved)
+    }
+  }
+
+  function setDefautlMarginCode(address default_code) external {
+    assembly {
+      /* ensure caller is manager */
+      if xor(caller, sload(_manager_address_slot)) {
+        REVERT(1)
+      }
+
+      sstore(add(_approved_margin_code_slot, default_code), 1)
+      sstore(_default_code_slot, default_code)
+    }
+  }
+
+  /* allows user to update to margin code */
+  function setMarginCode(address margin_code_address) external {
+    address margin_contract = getMarginAddress(address(msg.sender));
+
+    uint256[2] memory m_in;
+
+    assembly {
+      /* margin contract must be deployed */
+      if iszero(extcodesize(margin_contract)) {
+        REVERT(1)
+      }
+
+      /* if not approved, remove from whitelist */
+      let approved := sload(add(_approved_margin_code_slot, margin_code_address))
+      sstore(add(_white_listed_addresses_slot, margin_contract), approved)
+
+      /* call margin contract to update code */
+      {
+        mstore(m_in, fn_hash("setCode(address)"))
+        mstore(add(m_in, 0x04), margin_code_address)
+
+        let res := call(
+          gas, margin_contract, 0,
+          m_in, 0x24,
+          0x00, 0x00
+        )
+
+        if iszero(res) {
+          REVERT(2)
+        }
+      }
+    }
   }
 
   function managerPropose(address new_manager) external {
@@ -60,17 +120,13 @@ contract MarginParent {
       mstore(cursor, address) \
       cursor := add(cursor, 0x20) \
 \
-      mstore(cursor, sload(_comptroller_address_slot)) \
-      cursor := add(cursor, 0x20) \
-\
-      mstore(cursor, sload(_cEther_address_slot)) \
-      cursor := add(cursor, 0x20) \
-\
       mstore(0x40, cursor)
 
 
   function setupMargin() external returns (address margin_contract) {
     bytes memory margin_swap_compiled = _margin_swap_compiled;
+
+    uint256[2] memory m_in;
 
     assembly {
       let compiled_bytes := mload(margin_swap_compiled)
@@ -89,8 +145,28 @@ contract MarginParent {
         REVERT(1)
       }
 
-      sstore(_last_create_address_slot, margin_contract)
       sstore(add(_white_listed_addresses_slot, margin_contract), 1)
+
+      {
+        mstore(m_in, fn_hash("setCode(address)"))
+        mstore(add(m_in, 0x04), sload(_default_code_slot))
+
+        let res := call(
+          gas, margin_contract, 0,
+          m_in, 0x24,
+          0x0, 0x0
+        )
+        
+        if iszero(res) {
+          REVERT(2)
+        }
+      }
+
+      log_event(
+        MarginSetup, m_in,
+        caller,
+        margin_contract
+      )
     }
   }
 

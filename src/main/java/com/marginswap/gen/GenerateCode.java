@@ -9,7 +9,13 @@ import static dev.dcn.web3.gen.GenerateContractCode.ContractToJava;
 public class GenerateCode {
     public static void main(String[] args) throws IOException, InterruptedException {
         ContractToJava(
-                new File("src/main/resources/contracts/Margin.sol"),
+                new File("src/main/resources/contracts/MarginSwap.sol"),
+                new File("src/main/generated"),
+                "com.marginswap.contracts"
+        );
+
+        ContractToJava(
+                new File("src/main/resources/contracts/MarginProxy.sol"),
                 new File("src/main/generated"),
                 "com.marginswap.contracts"
         );
@@ -39,18 +45,13 @@ public class GenerateCode {
         );
 
         CompileContract(
-                new File("src/main/resources/contracts/Margin.sol"),
-                new File("contracts-compiled/Margin")
+                new File("src/main/resources/contracts/MarginSwap.sol"),
+                new File("contracts-compiled/MarginSwap")
         );
 
         CompileContract(
-                new File("src/main/resources/contracts/ComptrollerMock.sol"),
-                new File("contracts-compiled/ComptrollerMock")
-        );
-
-        CompileContract(
-                new File("src/main/resources/contracts/CompoundMock.sol"),
-                new File("contracts-compiled/CompoundMock")
+                new File("src/main/resources/contracts/MarginProxy.sol"),
+                new File("contracts-compiled/MarginProxy")
         );
 
         ContractToJava(

@@ -1,9 +1,10 @@
 pragma solidity ^0.5.7;
 contract MarginSwap {
+  uint256 _code;
   uint256 _owner;
   uint256 _parent_address;
+  uint256 _run_state;
   uint256 _comptroller_address;
-  uint256 _cEther_address;
   uint256[2**160] _compound_lookup;
   event Trade(
     address indexed trade_contract,
@@ -14,17 +15,27 @@ contract MarginSwap {
     uint256 input_fee
   );
   
-  constructor(address owner, address parent_address, address comptroller_address, address cEther_address) public  {
+  function () external payable  {}
+  
+  function setComptrollerAddress(address comptroller) external  {
     assembly {
-      sstore(_owner_slot, owner)
-      sstore(_parent_address_slot, parent_address)
-      sstore(_comptroller_address_slot, comptroller_address)
-      sstore(_cEther_address_slot, cEther_address)
-      sstore(_trade_running_slot, 1)
+      if xor(caller, sload(_owner_slot)) {
+        mstore(32, 1)
+        revert(63, 1)
+      }
+      sstore(_comptroller_address_slot, comptroller)
     }
   }
   
-  function () external payable  {}
+  function comptrollerAddress() public view 
+  returns (address comptroller) {
+    assembly {
+      comptroller := sload(_comptroller_address_slot)
+      if iszero(comptroller) {
+        comptroller := 0x3d9819210a31b4961b30ef54be2aed79b9c9cd3b
+      }
+    }
+  }
   
   function lookupUnderlying(address cToken) public view 
   returns (address result) {
@@ -53,7 +64,11 @@ contract MarginSwap {
         let call_input := mload(0x40)
         let call_input_size := calldatasize
         calldatacopy(call_input, 0, call_input_size)
-        let res := call(gas, sload(_comptroller_address_slot), 0, call_input, call_input_size, call_input, sub(call_input_size, 4))
+        let comptroller_address := sload(_comptroller_address_slot)
+        if iszero(comptroller_address) {
+          comptroller_address := 0x3d9819210a31b4961b30ef54be2aed79b9c9cd3b
+        }
+        let res := call(gas, comptroller_address, 0, call_input, call_input_size, call_input, sub(call_input_size, 4))
         if iszero(res) {
           mstore(32, 3)
           revert(63, 1)
@@ -80,7 +95,6 @@ contract MarginSwap {
           revert(63, 1)
         }
       }
-      let cEther_addr := sload(_cEther_address_slot)
       let array_end := add(array_start, mul(array_length, 0x20))
       for {
         let i := array_start
@@ -92,13 +106,11 @@ contract MarginSwap {
         let m_out := add(mem_ptr, 4)
         {
           mstore(m_out, 0)
-          if xor(cToken_addr, cEther_addr) {
-            mstore(mem_ptr, /* fn_hash("underlying()") */ 0x6f307dc300000000000000000000000000000000000000000000000000000000)
-            let res := staticcall(gas, cToken_addr, mem_ptr, 4, m_out, 32)
-            if iszero(res) {
-              mstore(32, 7)
-              revert(63, 1)
-            }
+          mstore(mem_ptr, /* fn_hash("underlying()") */ 0x6f307dc300000000000000000000000000000000000000000000000000000000)
+          let res := staticcall(gas, cToken_addr, mem_ptr, 4, m_out, 32)
+          if iszero(res) {
+            mstore(32, 7)
+            revert(63, 1)
           }
         }
         let underlying_addr := mload(m_out)
@@ -173,7 +185,6 @@ contract MarginSwap {
           revert(63, 1)
         }
       }
-      let cEther_addr := sload(_cEther_address_slot)
       {
         let borrow_amount := mload(m_out)
         let to_repay := borrow_amount
@@ -184,7 +195,7 @@ contract MarginSwap {
           mstore(m_in, /* fn_hash("repayBorrow()") */ 0x4e4d9fea00000000000000000000000000000000000000000000000000000000)
           let m_in_size := 4
           let wei_to_send := to_repay
-          if xor(c_address, cEther_addr) {
+          if asset_address {
             mstore(m_in, /* fn_hash("repayBorrow(uint256)") */ 0x0e75270200000000000000000000000000000000000000000000000000000000)
             mstore(add(m_in, 4), to_repay)
             m_in_size := 36
@@ -197,7 +208,7 @@ contract MarginSwap {
           }
           switch returndatasize
             case 0 {
-              if xor(c_address, cEther_addr) {
+              if asset_address {
                 mstore(32, 103)
                 revert(63, 1)
               }
@@ -220,7 +231,7 @@ contract MarginSwap {
           mstore(m_in, /* fn_hash("mint()") */ 0x1249c58b00000000000000000000000000000000000000000000000000000000)
           let m_in_size := 4
           let wei_to_send := amount
-          if xor(c_address, cEther_addr) {
+          if asset_address {
             mstore(m_in, /* fn_hash("mint(uint256)") */ 0xa0712d6800000000000000000000000000000000000000000000000000000000)
             mstore(add(m_in, 4), amount)
             m_in_size := 0x24
@@ -233,7 +244,7 @@ contract MarginSwap {
           }
           switch returndatasize
             case 0 {
-              if xor(c_address, cEther_addr) {
+              if asset_address {
                 mstore(32, 107)
                 revert(63, 1)
               }
@@ -377,7 +388,6 @@ contract MarginSwap {
       }
     }
   }
-  uint256 _trade_running;
   
   function trade(address input_asset,
                  uint256 input_amount,
@@ -396,11 +406,11 @@ contract MarginSwap {
         revert(63, 1)
       }
       {
-        if eq(sload(_trade_running_slot), 2) {
+        if xor(sload(_run_state_slot), 1) {
           mstore(32, 1)
           revert(63, 1)
         }
-        sstore(_trade_running_slot, 2)
+        sstore(_run_state_slot, 2)
       }
       let capital_source := sload(_parent_address_slot)
       {
@@ -501,7 +511,7 @@ contract MarginSwap {
     }
     _withdraw(input_asset, return_amount, address(_parent_address));
     assembly {
-      sstore(_trade_running_slot, 1)
+      sstore(_run_state_slot, 1)
       
       /* Log event: Trade */
       mstore(m_in, input_asset)

@@ -1,9 +1,6 @@
 package com.marginswap;
 
-import com.marginswap.contracts.CompoundMock;
-import com.marginswap.contracts.ComptrollerMock;
-import com.marginswap.contracts.ERC20;
-import com.marginswap.contracts.MarginParent;
+import com.marginswap.contracts.*;
 import dev.dcn.test.Accounts;
 import dev.dcn.test.StaticNetwork;
 import dev.dcn.web3.EtherTransactions;
@@ -19,6 +16,7 @@ public class Network {
     public static final String CEther;
     public static final String CToken;
     public static final String Token;
+    public static final String Impl;
     public static final String Parent;
     public static final String Margin;
     public static final EtherTransactions owner;
@@ -47,10 +45,17 @@ public class Network {
                     BigInteger.ZERO
             );
 
+            Impl = owner.deployContract(
+                    BigInteger.ZERO,
+                    StaticNetwork.GAS_LIMIT,
+                    MarginSwap.BINARY,
+                    BigInteger.ZERO
+            );
+
             Parent = owner.deployContract(
                     BigInteger.ZERO,
                     StaticNetwork.GAS_LIMIT,
-                    MarginParent.DeployData(Comptroller, CEther),
+                    MarginParent.DeployData(Impl),
                     BigInteger.ZERO
             );
 
@@ -80,14 +85,23 @@ public class Network {
                     Parent, owner.getWeb3(),
                     MarginParent.isMarginSetup(owner.getAddress())
             );
+
             assertTrue(isSetup.enabled);
             Margin = isSetup.margin_contract;
+
+            assertSuccess(owner.sendCall(Margin, MarginSwap.setComptrollerAddress(Comptroller)));
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
     }
 
     public static void DescribeCheckpoint() {
+        try {
+            owner.reloadNonce();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
         beforeAll(StaticNetwork::Checkpoint);
         afterAll(StaticNetwork::Revert);
     }
