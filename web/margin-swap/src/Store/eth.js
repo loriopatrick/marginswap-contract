@@ -12,7 +12,7 @@ const ORACLE_ABI = require('abi/PriceOracle.json');
 const UNISWAP_FACTORY_ABI = require('abi/UniswapFactory.json');
 const UNISWAP_EXCHANGE_ABI = require('abi/UniswapExchange.json');
 
-const MARGIN_PARENT_ADDRESS = '0x520ac2c0001f8be421951227b86ebd4e89a8c34c'; // mainnet
+const MARGIN_PARENT_ADDRESS = '0x1a099e2d91f537fae5523f57d182ce522aa9780c'; // mainnet
 const COMPTROLLER_ADDRESS = '0x3d9819210a31b4961b30ef54be2aed79b9c9cd3b'; // mainnet
 
 // const MARGIN_PARENT_ADDRESS = '0xe8eb3c65c2de1b7b7244abb691e92c19001c282c'; // ropsten
