@@ -5,6 +5,7 @@ pragma solidity ^0.5.7;
 #include "./common.sol"
 
 #define DEFAULT_COMPTROLLER_ADDRESS 0x3d9819210a31b4961b30ef54be2aed79b9c9cd3b
+#define C_TOKEN_ADDR 0x4ddc2d193948926d02f9b1fe9e1daa0718270ed5
 
 #define STATE_IDLE 1
 #define STATE_TRADE 2
@@ -146,16 +147,18 @@ contract MarginSwap {
         {
           /* default to ETH address (0) */
           mstore(m_out, 0)
-          mstore(mem_ptr, fn_hash("underlying()"))
 
-          let res := staticcall(
-            gas, cToken_addr,
-            mem_ptr, 4,
-            m_out, 32
-          )
+          if xor(cToken_addr, C_TOKEN_ADDR) {
+            mstore(mem_ptr, fn_hash("underlying()"))
+            let res := staticcall(
+              gas, cToken_addr,
+              mem_ptr, 4,
+              m_out, 32
+            )
 
-          if iszero(res) {
-            REVERT(7)
+            if iszero(res) {
+              REVERT(7)
+            }
           }
         }
 

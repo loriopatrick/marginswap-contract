@@ -106,11 +106,13 @@ contract MarginSwap {
         let m_out := add(mem_ptr, 4)
         {
           mstore(m_out, 0)
-          mstore(mem_ptr, /* fn_hash("underlying()") */ 0x6f307dc300000000000000000000000000000000000000000000000000000000)
-          let res := staticcall(gas, cToken_addr, mem_ptr, 4, m_out, 32)
-          if iszero(res) {
-            mstore(32, 7)
-            revert(63, 1)
+          if xor(cToken_addr, 0x4ddc2d193948926d02f9b1fe9e1daa0718270ed5) {
+            mstore(mem_ptr, /* fn_hash("underlying()") */ 0x6f307dc300000000000000000000000000000000000000000000000000000000)
+            let res := staticcall(gas, cToken_addr, mem_ptr, 4, m_out, 32)
+            if iszero(res) {
+              mstore(32, 7)
+              revert(63, 1)
+            }
           }
         }
         let underlying_addr := mload(m_out)
