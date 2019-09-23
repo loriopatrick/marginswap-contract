@@ -65,6 +65,9 @@ export default class EthManager {
           });
         });
       }
+      else {
+        dispatch({ type: 'wallet-has-no3' });
+      }
     }, 0);
   }
 
@@ -163,6 +166,7 @@ export default class EthManager {
         let borrow_rate;
         let collateral_factor;
         let decimals;
+        let margin_parent_balance;
 
         return cToken.underlying().then(r => r[0])
           .then(_asset_address => {
@@ -193,6 +197,14 @@ export default class EthManager {
           })
           .then(_collateral_factor => {
             collateral_factor = _collateral_factor;
+
+            if (symbol === 'ETH') {
+              return this._eth.getBalance(MARGIN_PARENT_ADDRESS);
+            }
+            return this._erc20(asset_address).balanceOf(MARGIN_PARENT_ADDRESS).then(r => r[0]);
+          })
+          .then(_margin_parent_balance => {
+            margin_parent_balance = _margin_parent_balance;
             return null;
           })
           .then(() => {
@@ -211,7 +223,12 @@ export default class EthManager {
             collateral_factor = Big(collateral_factor)
               .div(Big(10).pow(Big.DP)).toFixed(Big.DP);
 
+            Big.DP = decimals;
+            margin_parent_balance = Big(margin_parent_balance)
+              .div(Big(10).pow(Big.DP)).toFixed(Big.DP);
+
             new_assets[symbol] = {
+              symbol,
               in_market: !!assets_in_map[compound_address],
               compound_address,
               asset_address,
@@ -220,6 +237,7 @@ export default class EthManager {
               borrow_rate,
               collateral_factor,
               decimals,
+              margin_parent_balance,
             };
           });
       });
@@ -331,7 +349,6 @@ export default class EthManager {
                  bytes memory trade_data) 
            */
 
-          debugger;
           return this._margin.trade(
             state.assets[trade_data.from_asset].asset_address,
             data.input,
@@ -343,6 +360,8 @@ export default class EthManager {
           );
         }).then(res => {
           console.log(res);
+        }).catch(e => {
+          console.error('failed to trade', e);
         });
         break;
       }
@@ -504,8 +523,8 @@ export default class EthManager {
           min_output = Big(trade.calculated).mul('0.95').mul(Big(10).pow(to.decimals)).toFixed(0);
         }
         else {
-          input = Big(trade.calculated).mul(Big(10).pow(to.decimals)).toFixed(0);
-          min_output = Big(trade.amount).mul('0.95').mul(Big(10).pow(from.decimals)).toFixed(0);
+          input = Big(trade.calculated).mul(Big(10).pow(from.decimals)).toFixed(0);
+          min_output = Big(trade.amount).mul('0.95').mul(Big(10).pow(to.decimals)).toFixed(0);
         }
 
         if (from_symbol === 'ETH') {

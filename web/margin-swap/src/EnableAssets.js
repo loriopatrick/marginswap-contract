@@ -46,26 +46,30 @@ class EnableAssets extends Component {
   }
 
   render() {
-    const { assets } = this.props;
+    const { assets, remove_active, } = this.props;
 
     let selected_count = 0;
 
-    const asset_els = Object.keys(ASSETS).map(symbol => {
+    const asset_els = [];
+    Object.keys(ASSETS).forEach(symbol => {
       const a = assets[symbol];
       if (!a) {
-        return null;
+        return;
       }
 
       const cls = ['option'];
       if (a.in_market) {
         cls.push('active');
+        if (remove_active) {
+          return;
+        }
       }
       else if (this.state[symbol]) {
         cls.push('selected');
         selected_count++;
       }
 
-      return (
+      asset_els.push(
         <div
           className={cls.join(' ')}
           key={symbol}
@@ -81,7 +85,9 @@ class EnableAssets extends Component {
       <div className="EnableAssets">
         <div className="SelectAsset">
           <div className="title">Select assets to enable for margin</div>
-          { asset_els }
+          <div>
+            { asset_els }
+          </div>
         </div>
         <div className="btn blue" onClick={this.enable.bind(this)}>
           Enable { selected_count } assets for margin.

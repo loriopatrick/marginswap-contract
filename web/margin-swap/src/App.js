@@ -12,7 +12,7 @@ import EnableAssets from './EnableAssets';
 import {
   marginDeposit,
   enterMarkets,
-  trade,
+  triggerTrade,
 } from 'Store/actions';
 
 import {
@@ -20,6 +20,8 @@ import {
   marginView,
   interestView,
   tradeView,
+  assetsView,
+  isReadyView,
 } from 'Store/view';
 
 import assets from 'assets';
@@ -51,11 +53,17 @@ class App extends Component {
   }
 
   render() {
+    const { trade, is_ready, dispatch } = this.props;
+
     let modal = null;
     if (this.state.select_asset_modal) {
       const is_input = this.state.select_asset_is_input;
-      const { trade } = this.props;
       const asset_symbol = is_input ? trade.from_asset : trade.to_asset;
+
+      let assets = this.props.assets;
+      if (!is_input) {
+        assets = assets.filter(a => a.in_market);
+      }
 
       modal = (
         <Modal onClose={() => this.setState({ select_asset_modal: false })} >
@@ -63,7 +71,10 @@ class App extends Component {
             title={is_input ? 'Select input asset' : 'Select output asset'}
             selected={asset_symbol}
             onSelect={this.selectAsset.bind(this, is_input)}
-          />
+            assets={assets}
+          >
+            <EnableAssets remove_active={true} />
+          </SelectAsset>
         </Modal>
       );
     }
@@ -76,6 +87,27 @@ class App extends Component {
       );
     }
 
+    let data_el = null;
+    let trade_el = null;
+
+    if (is_ready) {
+      data_el = (
+        <div className="data">
+          { this.renderAccounts() }
+        </div>
+      );
+
+      trade_el = (
+        <div className="btn red" onClick={() => dispatch(triggerTrade())}>
+          TRADE
+        </div>
+      );
+    }
+    else {
+      trade_el = (
+        <WalletStatus />
+      );
+    }
 
     return (
       <div className="App">
@@ -90,41 +122,12 @@ class App extends Component {
               { this.renderInput(true) }
               { this.renderInput(false) }
             </div>
-            <div className="btn red" onClick={() => this.props.dispatch(trade())}>
-              TRADE
-            </div>
-            <div className="data">
-              { this.renderAccounts() }
-      {/*
-              <div className="positions">
-                { position() }
-              </div>
-      */}
-            </div>
-
+            { trade_el }
+            { data_el }
           </div>
         </div>
       </div>
     );
-    //
-  //  let position = () => {
-  //    return (
-  //      <div className="position">
-  //        <div className="from">
-  //          1.321 <div className="asset"><img src={asset_images.ETH} /> ETH</div>
-  //        </div>
-  //        <div className="to">
-  //          1.321 <div className="asset"><img src={asset_images.ETH} /> ETH</div>
-  //        </div>
-  //        <div className="profit">
-  //          + 2.3%
-  //        </div>
-  //        <div className="state">
-  //          unrealized
-  //        </div>
-  //      </div>
-  //    );
-  //  };
   }
 
   selectAssetModal(is_input) {
@@ -222,7 +225,11 @@ class App extends Component {
 
     let accounts_el = null;
     if (balances.loading) {
-      accounts_el = <Spinner />;
+      accounts_el = (
+        <div className="account">
+          <Spinner />
+        </div>
+      );
     }
     else {
       accounts_el = balances.items.map(accountEl);
@@ -282,4 +289,6 @@ export default connect(state => ({
   margin: marginView(state),
   interest: interestView(state),
   trade: tradeView(state),
+  is_ready: isReadyView(state),
+  assets: assetsView(state),
 }))(App);

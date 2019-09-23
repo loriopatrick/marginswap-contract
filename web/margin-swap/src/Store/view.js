@@ -29,16 +29,34 @@ function viewCache(key, state, fn) {
   return line.result;
 }
 
+export function assetsView(state) {
+  return viewCache('assets', [ state.assets ], ([ assets ]) => {
+    return Object.keys(assets).map(s => assets[s]);
+  });
+}
+
 export function walletView(state) {
-  return viewCache('wallet', [ state.wallet ], ([ wallet ]) => ({
-    has_web3: wallet.has_web3,
-    address: wallet.address,
-    connected: !!wallet.address,
-    processing: wallet.processing,
-    margin_address: wallet.margin_address,
-    margin_setup: wallet.margin_setup,
-    loading: wallet.address && !wallet.margin_address,
-  }));
+  return viewCache('wallet', [ state.wallet ], ([ wallet ]) => {
+    if (wallet.loading) {
+      return {
+        processing: 'Loading',
+      };
+    }
+
+    return {
+      has_web3: wallet.has_web3,
+      address: wallet.address,
+      connected: !!wallet.address,
+      processing: wallet.processing,
+      margin_address: wallet.margin_address,
+      margin_setup: wallet.margin_setup,
+      loading: wallet.address && !wallet.margin_address,
+    };
+  });
+}
+
+export function isReadyView(state) {
+  return state.wallet.address && state.wallet.margin_setup;
 }
 
 function balances_loading(balances, assets) {
@@ -183,7 +201,31 @@ export function tradeView(state) {
             value: '',
             placeholder: '0.0',
             loading: false,
-          }
+          },
+        };
+      }
+
+      if (!to.in_market) {
+        let input_value = '';
+        if (trade.is_input_active) {
+          input_value = trade.amount;
+        }
+
+        return {
+          loading: false,
+          input: {
+            symbol: from_asset,
+            value: input_value,
+            placeholder: '0.0',
+            loading: false,
+          },
+          output: {
+            symbol: '-',
+            value: '',
+            placeholder: '0.0',
+            loading: false,
+          },
+          is_input_active: trade.is_input_active,
         };
       }
 
@@ -223,6 +265,10 @@ export function tradeView(state) {
       let max_input = Big(liquidity).div(
         Big(from.asset_price).mul(Big(1).sub(Big(0.9).mul(to.collateral_factor)))
       );
+
+      if (max_input.gt(from.margin_parent_balance)) {
+        max_input = Big(from.margin_parent_balance);
+      }
 
       Big.RM = 0;
       Big.NE = -10000000000000;

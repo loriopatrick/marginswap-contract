@@ -147,18 +147,28 @@
       }
 
       & > .btn {
-        border-color: $background;
-        padding: 30px;
-        justify-content: center;
         margin: 5px 0;
-        background: mix($error, $background, 50%);
-        color: mix($background, $text-color, 20%);
+        justify-content: center;
+        padding: 30px;
 
         &:hover {
-          border-color: $error;
-          background: mix($error, $background, 70%);
-          color: $text-color;
+          .status {
+            flex-grow: 0;
+          }
         }
+
+        &:not(.WalletStatus) {
+          border-color: $background;
+          background: mix($error, $background, 50%);
+          color: mix($background, $text-color, 20%);
+
+          &:hover {
+            border-color: $error;
+            background: mix($error, $background, 70%);
+            color: $text-color;
+          }
+        }
+
       }
 
       .positions {
@@ -215,6 +225,15 @@
             }
             &.red {
               color: $red;
+            }
+          }
+
+          .Spinner {
+            & > div {
+              width: $font-size;
+              height: $font-size;
+              padding: 0;
+              margin: 0;
             }
           }
 

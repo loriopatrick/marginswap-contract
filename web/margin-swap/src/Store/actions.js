@@ -18,7 +18,7 @@ export function enableAssets(assets) {
   return { type: 'trigger-enable-assets', assets, };
 }
 
-export function trade() {
+export function triggerTrade() {
   return (dispatch, getState) => {
     dispatch({
       type: 'trigger-trade',

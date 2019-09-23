@@ -3,6 +3,7 @@ import tradeCalcKey from './trade_calc_key';
 const INIT_STATE = {
   eth_price: '200',
   wallet: {
+    loading: true,
     has_web3: false,
     address: null,
     processing: null,
@@ -12,6 +13,7 @@ const INIT_STATE = {
   assets: {
     /*
      * [asset_symbol]: {
+     *   symbol,
      *   compound_address,
      *   asset_address,
      *   decimals,
@@ -19,6 +21,7 @@ const INIT_STATE = {
      *   supply_rate,
      *   asset_price,
      *   collateral_factor,
+     *   margin_parent_balance,
      * }
      */
   },
@@ -118,11 +121,21 @@ const reducer = (state = INIT_STATE, action) => {
         liquidity: action.liquidity,
       };
     }
+    case 'wallet-has-no3': {
+      return {
+        ...state,
+        wallet: {
+          ...state.wallet,
+          loading: false,
+        },
+      };
+    }
     case 'wallet-has3': {
       return {
         ...state,
         wallet: {
           ...state.wallet,
+          loading: false,
           has_web3: true,
         },
       };
