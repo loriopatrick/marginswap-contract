@@ -1,6 +1,10 @@
 package com.marginswap;
 
-import com.marginswap.contracts.*;
+import com.marginswap.contracts.ERC20;
+import com.marginswap.contracts.MarginParent;
+import com.marginswap.contracts.MarginSwap;
+import com.marginswap.contracts.mock.CompoundMock;
+import com.marginswap.contracts.mock.ComptrollerMock;
 import dev.dcn.test.Accounts;
 import dev.dcn.test.StaticNetwork;
 import dev.dcn.web3.EtherTransactions;
@@ -96,18 +100,19 @@ public class Network {
     }
 
     public static void DescribeCheckpoint() {
-        try {
-            owner.reloadNonce();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-
         beforeAll(StaticNetwork::Checkpoint);
-        afterAll(StaticNetwork::Revert);
+        afterAll(() -> {
+            StaticNetwork.Revert();
+            owner.reloadNonce();
+        });
     }
 
     public static void DescribeCheckpointForEach() {
         beforeEach(StaticNetwork::Checkpoint);
-        afterEach(StaticNetwork::Revert);
+        afterEach(() -> {
+            StaticNetwork.Revert();
+            owner.reloadNonce();
+            Accounts.getTx(3).reloadNonce();
+        });
     }
 }

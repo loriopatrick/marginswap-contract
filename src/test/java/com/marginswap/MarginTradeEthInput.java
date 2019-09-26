@@ -1,15 +1,13 @@
 package com.marginswap;
 
 import com.greghaskins.spectrum.Spectrum;
-import com.marginswap.contracts.CompoundMock;
+import com.marginswap.contracts.mock.CompoundMock;
 import com.marginswap.contracts.ERC20;
 import com.marginswap.contracts.MarginSwap;
-import com.marginswap.contracts.TradeMock;
+import com.marginswap.contracts.mock.TradeMock;
 import dev.dcn.test.StaticNetwork;
 import org.junit.runner.RunWith;
 import org.web3j.abi.FunctionEncoder;
-import org.web3j.protocol.core.DefaultBlockParameter;
-import org.web3j.protocol.core.DefaultBlockParameterName;
 
 import java.math.BigInteger;
 import java.util.Arrays;

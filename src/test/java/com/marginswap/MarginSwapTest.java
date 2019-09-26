@@ -1,20 +1,27 @@
 package com.marginswap;
 
 import com.greghaskins.spectrum.Spectrum;
-import com.marginswap.contracts.*;
+import com.marginswap.contracts.ERC20;
+import com.marginswap.contracts.MarginSwap;
+import com.marginswap.contracts.mock.CompoundMock;
+import com.marginswap.contracts.mock.ComptrollerMock;
+import com.marginswap.contracts.mock.TradeMock;
 import dev.dcn.test.Accounts;
 import dev.dcn.test.StaticNetwork;
 import dev.dcn.web3.EtherTransactions;
 import org.junit.runner.RunWith;
 import org.web3j.abi.FunctionEncoder;
+import org.web3j.abi.datatypes.Function;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.response.Log;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 
 import java.math.BigInteger;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
+import static com.greghaskins.spectrum.Spectrum.describe;
 import static com.greghaskins.spectrum.Spectrum.it;
 import static dev.dcn.test.AssertHelpers.assertRevert;
 import static dev.dcn.test.AssertHelpers.assertSuccess;
@@ -24,6 +31,30 @@ import static org.junit.Assert.*;
 public class MarginSwapTest {
     {
         Network.DescribeCheckpoint();
+
+        describe("permission checks", () -> {
+            Network.DescribeCheckpointForEach();
+
+            it("only owner should be able to setComptroller", () -> {
+                Function function = MarginSwap.setComptrollerAddress("0x00");
+
+                assertRevert("0x01", Accounts.getTx(3).sendCall(Network.Margin,
+                        function));
+
+                assertSuccess(Network.owner.sendCall(Network.Margin,
+                        function));
+            });
+
+            it("only owner should be able to enterMarkets", () -> {
+                Function function = MarginSwap.enterMarkets(Collections.singletonList(Network.CEther));
+
+                assertRevert("0x00", Accounts.getTx(3).sendCall(Network.Margin,
+                        function));
+
+                assertSuccess(Network.owner.sendCall(Network.Margin,
+                        function));
+            });
+        });
 
         it("should not be able to enter markets with non owner account", () -> {
             assertRevert("0x00", Accounts.getTx(10).sendCall(Network.Margin,
