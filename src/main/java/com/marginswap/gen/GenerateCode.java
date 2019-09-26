@@ -21,25 +21,7 @@ public class GenerateCode {
         );
 
         ContractToJava(
-                new File("src/main/resources/contracts/CompoundMock.sol"),
-                new File("src/main/generated"),
-                "com.marginswap.contracts"
-        );
-
-        ContractToJava(
                 new File("src/main/resources/contracts/ERC20.sol"),
-                new File("src/main/generated"),
-                "com.marginswap.contracts"
-        );
-
-        ContractToJava(
-                new File("src/main/resources/contracts/ComptrollerMock.sol"),
-                new File("src/main/generated"),
-                "com.marginswap.contracts"
-        );
-
-        ContractToJava(
-                new File("src/main/resources/contracts/TradeMock.sol"),
                 new File("src/main/generated"),
                 "com.marginswap.contracts"
         );

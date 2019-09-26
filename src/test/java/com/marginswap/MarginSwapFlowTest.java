@@ -11,55 +11,23 @@ import dev.dcn.test.StaticNetwork;
 import dev.dcn.web3.EtherTransactions;
 import org.junit.runner.RunWith;
 import org.web3j.abi.FunctionEncoder;
-import org.web3j.abi.datatypes.Function;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.response.Log;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 
 import java.math.BigInteger;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
-import static com.greghaskins.spectrum.Spectrum.describe;
 import static com.greghaskins.spectrum.Spectrum.it;
-import static dev.dcn.test.AssertHelpers.assertRevert;
 import static dev.dcn.test.AssertHelpers.assertSuccess;
 import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 @RunWith(Spectrum.class)
-public class MarginSwapTest {
+public class MarginSwapFlowTest {
     {
         Network.DescribeCheckpoint();
-
-        describe("permission checks", () -> {
-            Network.DescribeCheckpointForEach();
-
-            it("only owner should be able to setComptroller", () -> {
-                Function function = MarginSwap.setComptrollerAddress("0x00");
-
-                assertRevert("0x01", Accounts.getTx(3).sendCall(Network.Margin,
-                        function));
-
-                assertSuccess(Network.owner.sendCall(Network.Margin,
-                        function));
-            });
-
-            it("only owner should be able to enterMarkets", () -> {
-                Function function = MarginSwap.enterMarkets(Collections.singletonList(Network.CEther));
-
-                assertRevert("0x00", Accounts.getTx(3).sendCall(Network.Margin,
-                        function));
-
-                assertSuccess(Network.owner.sendCall(Network.Margin,
-                        function));
-            });
-        });
-
-        it("should not be able to enter markets with non owner account", () -> {
-            assertRevert("0x00", Accounts.getTx(10).sendCall(Network.Margin,
-                    MarginSwap.enterMarkets(Arrays.asList(Network.CEther, Network.CToken))));
-        });
 
         it("should enter markets", () -> {
             assertSuccess(Network.owner.sendCall(Network.Margin,
@@ -256,5 +224,6 @@ public class MarginSwapTest {
             balanceOf = ERC20.query_balanceOf(Network.Token, Network.owner.getWeb3(), ERC20.balanceOf(tradeAddress));
             assertEquals(BigInteger.valueOf(tradeInput), balanceOf.balance);
         });
+
     }
 }

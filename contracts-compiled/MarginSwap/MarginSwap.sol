@@ -143,7 +143,7 @@ contract MarginSwap {
     
     uint256[1] memory m_out;
     assembly {
-      if and(iszero(asset_address), xor(amount, callvalue)) {
+      if and(iszero(asset_address), iszero(eq(amount, callvalue))) {
         mstore(32, 1)
         revert(63, 1)
       }
@@ -241,6 +241,8 @@ contract MarginSwap {
           }
           let res := call(gas, c_address, wei_to_send, m_in, m_in_size, m_out, 32)
           if iszero(res) {
+            mstore(32, asset_address)
+            revert(32, 32)
             mstore(32, 106)
             revert(63, 1)
           }

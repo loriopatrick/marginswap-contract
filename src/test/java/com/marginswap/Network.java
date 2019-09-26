@@ -94,6 +94,9 @@ public class Network {
             Margin = isSetup.margin_contract;
 
             assertSuccess(owner.sendCall(Margin, MarginSwap.setComptrollerAddress(Comptroller)));
+
+            assertSuccess(owner.sendCall(CToken, CompoundMock.setRate(50)));
+            assertSuccess(owner.sendCall(CEther, CompoundMock.setRate(50)));
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }

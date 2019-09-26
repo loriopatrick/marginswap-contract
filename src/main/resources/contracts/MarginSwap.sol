@@ -214,7 +214,7 @@ contract MarginSwap {
 
     assembly {
       /* if ETH, ensure call value matches amount */
-      if and(iszero(asset_address), xor(amount, callvalue)) {
+      if and(iszero(asset_address), iszero(eq(amount, callvalue))) {
         REVERT(1)
       }
 
