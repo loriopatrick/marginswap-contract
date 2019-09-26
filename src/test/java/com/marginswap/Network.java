@@ -5,6 +5,7 @@ import com.marginswap.contracts.MarginParent;
 import com.marginswap.contracts.MarginSwap;
 import com.marginswap.contracts.mock.CompoundMock;
 import com.marginswap.contracts.mock.ComptrollerMock;
+import com.marginswap.contracts.mock.TradeMock;
 import dev.dcn.test.Accounts;
 import dev.dcn.test.StaticNetwork;
 import dev.dcn.web3.EtherTransactions;
@@ -23,6 +24,7 @@ public class Network {
     public static final String Impl;
     public static final String Parent;
     public static final String Margin;
+    public static final String Trade;
     public static final EtherTransactions owner;
 
     static {
@@ -80,6 +82,13 @@ public class Network {
                             new BigInteger("99999999999999999999999999999"),
                             "cToken", 8, "cToken", Token
                     ),
+                    BigInteger.ZERO
+            );
+
+            Trade = owner.deployContract(
+                    BigInteger.ZERO,
+                    StaticNetwork.GAS_LIMIT,
+                    TradeMock.BINARY,
                     BigInteger.ZERO
             );
 
