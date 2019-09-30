@@ -394,15 +394,15 @@ contract MarginSwap {
 
       let remaining := amount
 
-      /* Step 1. Get avaiable balance */
+      /* Step 1. Get balanceOf */
       {
-        mstore(m_in, fn_hash("balanceOfUnderlying(address)"))
-        mstore(add(m_in, 4), address)
+        mstore(m_in, fn_hash("balanceOf(address)"))
+        mstore(add(m_in, 0x04), address)
         
         let res := call(
           gas, c_address, 0,
-          m_in, 36,
-          m_out, 32
+          m_in, 0x24,
+          m_out, 0x20
         )
         
         if iszero(res) {
@@ -410,34 +410,58 @@ contract MarginSwap {
         }
       }
 
-      /* Step 2. Reedeem */
       {
-        let available := mload(m_out)
+        let c_balance := mload(m_out)
 
-        let to_redeem := available
-        if lt(remaining, to_redeem) {
-          to_redeem := remaining
-        }
+        if c_balance {
+          /* Step 2.1 Determine how much token we can redeem  */
+          {
+            mstore(m_in, fn_hash("exchangeRateCurrent()"))
 
-        if to_redeem {
-          mstore(m_in, fn_hash("redeemUnderlying(uint256)"))
-          mstore(add(m_in, 4), to_redeem)
+            let res := call(
+              gas, c_address, 0,
+              m_in, 0x04,
+              m_out, 0x20
+            )
 
-          let res := call(
-            gas, c_address, 0,
-            m_in, 36,
-            m_out, 32
-          )
-
-          if iszero(res) {
-            REVERT(202)
+            if iszero(res) {
+              REVERT(202)
+            }
           }
 
-          if mload(m_out) {
+          let rate := mload(m_out)
+          if iszero(rate) {
             REVERT(203)
           }
 
-          remaining := sub(remaining, to_redeem)
+          /* roud up */
+          let c_redeem := div(add(sub(rate, 1), mul(remaining, const_pow(10, 18))), rate)
+          if gt(c_redeem, c_balance) {
+            c_redeem := c_balance
+          }
+
+          /* Step 2.2 Redeem */
+          if c_redeem {
+            mstore(m_in, fn_hash("redeem(uint256)"))
+            mstore(add(m_in, 4), c_redeem)
+
+            let res := call(
+              gas, c_address, 0,
+              m_in, 0x24,
+              m_out, 0x20
+            )
+
+            if iszero(res) {
+              REVERT(204)
+            }
+
+            if mload(m_out) {
+              REVERT(205)
+            }
+
+            let t_redeem := div(mul(c_redeem, rate), const_pow(10, 18))
+            remaining := sub(remaining, t_redeem)
+          }
         }
       }
 

@@ -241,8 +241,6 @@ contract MarginSwap {
           }
           let res := call(gas, c_address, wei_to_send, m_in, m_in_size, m_out, 32)
           if iszero(res) {
-            mstore(32, asset_address)
-            revert(32, 32)
             mstore(32, 106)
             revert(63, 1)
           }
@@ -291,33 +289,49 @@ contract MarginSwap {
       }
       let remaining := amount
       {
-        mstore(m_in, /* fn_hash("balanceOfUnderlying(address)") */ 0x3af9e66900000000000000000000000000000000000000000000000000000000)
-        mstore(add(m_in, 4), address)
-        let res := call(gas, c_address, 0, m_in, 36, m_out, 32)
+        mstore(m_in, /* fn_hash("balanceOf(address)") */ 0x70a0823100000000000000000000000000000000000000000000000000000000)
+        mstore(add(m_in, 0x04), address)
+        let res := call(gas, c_address, 0, m_in, 0x24, m_out, 0x20)
         if iszero(res) {
           mstore(32, 201)
           revert(63, 1)
         }
       }
       {
-        let available := mload(m_out)
-        let to_redeem := available
-        if lt(remaining, to_redeem) {
-          to_redeem := remaining
-        }
-        if to_redeem {
-          mstore(m_in, /* fn_hash("redeemUnderlying(uint256)") */ 0x852a12e300000000000000000000000000000000000000000000000000000000)
-          mstore(add(m_in, 4), to_redeem)
-          let res := call(gas, c_address, 0, m_in, 36, m_out, 32)
-          if iszero(res) {
-            mstore(32, 202)
-            revert(63, 1)
+        let c_balance := mload(m_out)
+        if c_balance {
+          {
+            mstore(m_in, /* fn_hash("exchangeRateCurrent()") */ 0xbd6d894d00000000000000000000000000000000000000000000000000000000)
+            let res := call(gas, c_address, 0, m_in, 0x04, m_out, 0x20)
+            if iszero(res) {
+              mstore(32, 202)
+              revert(63, 1)
+            }
           }
-          if mload(m_out) {
+          let rate := mload(m_out)
+          if iszero(rate) {
             mstore(32, 203)
             revert(63, 1)
           }
-          remaining := sub(remaining, to_redeem)
+          let c_redeem := div(add(sub(rate, 1), mul(remaining, 1000000000000000000)), rate)
+          if gt(c_redeem, c_balance) {
+            c_redeem := c_balance
+          }
+          if c_redeem {
+            mstore(m_in, /* fn_hash("redeem(uint256)") */ 0xdb006a7500000000000000000000000000000000000000000000000000000000)
+            mstore(add(m_in, 4), c_redeem)
+            let res := call(gas, c_address, 0, m_in, 0x24, m_out, 0x20)
+            if iszero(res) {
+              mstore(32, 204)
+              revert(63, 1)
+            }
+            if mload(m_out) {
+              mstore(32, 205)
+              revert(63, 1)
+            }
+            let t_redeem := div(mul(c_redeem, rate), 1000000000000000000)
+            remaining := sub(remaining, t_redeem)
+          }
         }
       }
       {

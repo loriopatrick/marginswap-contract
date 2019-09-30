@@ -65,6 +65,25 @@ contract CompoundMock {
       return 0;
     }
 
+    function redeem(uint256 cAmount) public returns (uint) {
+      require(balances[msg.sender] >= cAmount);
+
+      uint amount = (cAmount * exchangeRateStored) / (10 ** 18);
+
+      balances[msg.sender] -= cAmount;
+      balanceOfUnderlying[msg.sender] -= amount;
+
+      if (underlying == address(0x0)) {
+        require(msg.sender.send(amount));
+      }
+      else {
+        CompoundMock erc20 = CompoundMock(underlying);
+        require(erc20.transfer(msg.sender, amount));
+      }
+
+      return 0;
+    }
+
     function redeemUnderlying(uint256 amount) public returns (uint) {
       require(balanceOfUnderlying[msg.sender] >= amount);
 

@@ -295,7 +295,7 @@ public class MarginSwapTests {
             assertSuccess(Network.owner.sendCall(Network.CEther,
                     CompoundMock.borrow(150)));
 
-            assertRevert("0xca", Network.owner.sendCall(Network.Margin,
+            assertRevert("0xcc", Network.owner.sendCall(Network.Margin,
                     MarginSwap.withdraw("0x0", 100, Network.owner.getAddress())));
         });
 
@@ -401,7 +401,7 @@ public class MarginSwapTests {
             assertSuccess(Network.owner.sendCall(Network.CToken,
                     CompoundMock.borrow(150)));
 
-            assertRevert("0xca", Network.owner.sendCall(Network.Margin,
+            assertRevert("0xcc", Network.owner.sendCall(Network.Margin,
                     MarginSwap.withdraw(Network.Token, 100, Network.owner.getAddress())));
         });
 
